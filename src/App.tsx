@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   FileText,
   LayoutDashboard,
+  Lock,
   Menu,
   Moon,
   Scale,
@@ -14,6 +15,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { getMode, persistMode, type DataMode, type Dataset } from './lib/dataSource'
+import { isRealUnlocked, unlockReal, verifyPin } from './lib/realAccess'
 import { applyTheme, getTheme, persistTheme, ThemeContext, type Theme } from './lib/theme'
 import { demo } from './data/demo'
 import { real } from './data/real'
@@ -49,17 +51,61 @@ const PLANNED: Partial<Record<NavKey, { title: string; note: string; icon: Lucid
   },
 }
 
+/** Stored "real" only counts if this tab has passed the PIN gate. */
+function initialMode(): DataMode {
+  const stored = getMode()
+  return stored === 'real' && !isRealUnlocked() ? 'demo' : stored
+}
+
 export default function App() {
-  const [mode, setModeState] = useState<DataMode>(getMode)
+  const [mode, setModeState] = useState<DataMode>(initialMode)
   const [theme, setThemeState] = useState<Theme>(getTheme)
   const [page, setPage] = useState<NavKey>('dashboard')
   const [navOpen, setNavOpen] = useState(false)
 
+  // PIN gate state
+  const [pinOpen, setPinOpen] = useState(false)
+  const [pinValue, setPinValue] = useState('')
+  const [pinError, setPinError] = useState('')
+  const [pinChecking, setPinChecking] = useState(false)
+  const pinInputRef = useRef<HTMLInputElement>(null)
+
   const data: Dataset = mode === 'demo' ? demo : real
+  const realLocked = !isRealUnlocked()
 
   function changeMode(next: DataMode) {
+    if (next === 'real' && !isRealUnlocked()) {
+      setPinValue('')
+      setPinError('')
+      setPinOpen(true)
+      return
+    }
     persistMode(next)
     setModeState(next)
+  }
+
+  function closePin() {
+    setPinOpen(false)
+    setPinValue('')
+    setPinError('')
+  }
+
+  async function submitPin(e: React.FormEvent) {
+    e.preventDefault()
+    if (pinChecking) return
+    setPinChecking(true)
+    setPinError('')
+    const ok = await verifyPin(pinValue)
+    setPinChecking(false)
+    if (ok) {
+      unlockReal()
+      persistMode('real')
+      setModeState('real')
+      closePin()
+    } else {
+      setPinError('Incorrect PIN. Try again.')
+      pinInputRef.current?.select()
+    }
   }
 
   function toggleTheme() {
@@ -73,6 +119,11 @@ export default function App() {
   useEffect(() => {
     setNavOpen(false)
   }, [page])
+
+  // Focus the PIN field when the modal opens.
+  useEffect(() => {
+    if (pinOpen) pinInputRef.current?.focus()
+  }, [pinOpen])
 
   return (
     <ThemeContext.Provider value={theme}>
@@ -185,12 +236,14 @@ export default function App() {
                 </button>
                 <button
                   onClick={() => changeMode('real')}
-                  className={`px-4 py-1.5 transition ${
+                  title={realLocked ? 'Real records are PIN-protected' : 'Real operational records'}
+                  className={`flex items-center gap-1.5 px-4 py-1.5 transition ${
                     mode === 'real'
                       ? 'bg-amber-600 text-white'
                       : 'bg-surface text-ink-soft hover:bg-subtle'
                   }`}
                 >
+                  {realLocked && <Lock size={11} />}
                   Real
                 </button>
               </div>
@@ -226,6 +279,68 @@ export default function App() {
           </main>
         </div>
       </div>
+
+      {/* PIN modal — gates Real data mode on the public deployment */}
+      {pinOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-brand-950/60 px-4"
+          onClick={closePin}
+          role="presentation"
+        >
+          <div
+            className="w-full max-w-sm rounded-xl border border-line bg-surface p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="pin-title"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300">
+                <Lock size={18} />
+              </div>
+              <div>
+                <h2 id="pin-title" className="text-sm font-semibold text-ink">
+                  Real data is protected
+                </h2>
+                <p className="text-xs text-ink-faint">Enter the admin PIN to view private records.</p>
+              </div>
+            </div>
+            <form onSubmit={submitPin} className="mt-5">
+              <input
+                ref={pinInputRef}
+                type="password"
+                value={pinValue}
+                onChange={(e) => setPinValue(e.target.value)}
+                placeholder="PIN"
+                autoComplete="off"
+                inputMode="text"
+                className={`w-full rounded-lg border bg-canvas px-3 py-2.5 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 ${
+                  pinError
+                    ? 'border-rose-400 focus:ring-rose-300'
+                    : 'border-line-strong focus:ring-brand-300'
+                }`}
+              />
+              {pinError && <p className="mt-2 text-xs text-rose-600 dark:text-rose-400">{pinError}</p>}
+              <div className="mt-4 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={closePin}
+                  className="rounded-lg border border-line-strong px-4 py-2 text-xs font-medium text-ink-soft transition hover:bg-subtle"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={pinChecking || pinValue.length === 0}
+                  className="rounded-lg bg-brand-600 px-4 py-2 text-xs font-medium text-white transition hover:bg-brand-700 disabled:opacity-50"
+                >
+                  {pinChecking ? 'Checking…' : 'Unlock'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </ThemeContext.Provider>
   )
 }
