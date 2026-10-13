@@ -1,15 +1,20 @@
-// Shared colour system — one palette for chips, chart cells, map markers and
-// progress bars, so a category is the same colour everywhere in the app.
+// Shared colour system — one blue family across chips, chart cells, map
+// markers and progress bars. Categories are separated by wide, clearly
+// visible steps of blue (deep navy → royal → sky → light sky → teal-blue)
+// so a category is the same colour everywhere in the app.
+//
+// Amber and rose are reserved STRICTLY for alerts (stale price, overdue
+// follow-up, no stock) — they mean "look here", never decoration.
 
 import type { CSSProperties } from 'react';
 import type { Category, ProspectStatus } from '../types';
 
 export const CATEGORY_COLORS: Record<Category, string> = {
-  cement: '#d97706', // amber-600
-  plumbing: '#0284c7', // sky-600
-  electrical: '#7c3aed', // violet-600
-  safety: '#059669', // emerald-600
-  tools: '#e11d48', // rose-600
+  cement: '#1e3a8a', // blue-900 — deep navy
+  plumbing: '#2563eb', // blue-600 — royal
+  electrical: '#0ea5e9', // sky-500 — bright sky
+  safety: '#93c5fd', // blue-300 — light sky
+  tools: '#0369a1', // sky-700 — teal-blue
 };
 
 /** Short labels for chart axes where the full label is too long. */
@@ -21,29 +26,41 @@ export const CATEGORY_SHORT: Record<Category, string> = {
   tools: 'Tools',
 };
 
+/** Pipeline stages read as deepening trust: light → mid → deep blue. */
 export const STATUS_COLORS: Record<ProspectStatus, string> = {
-  identified: '#a1a1aa', // zinc-400
-  contacted: '#0284c7', // sky-600
-  vetted: '#059669', // emerald-600
+  identified: '#93c5fd', // blue-300
+  contacted: '#3b82f6', // blue-500
+  vetted: '#1e3a8a', // blue-900
 };
 
+/** Blue steps wide enough apart for a six-slice donut. */
 export const CUSTOMER_TYPE_COLORS: Record<string, string> = {
-  contractor: '#4f46e5', // indigo-600
-  plumber: '#0284c7', // sky-600
-  electrician: '#d97706', // amber-600
-  business: '#7c3aed', // violet-600
-  individual: '#64748b', // slate-500
-  institution: '#0d9488', // teal-600
+  contractor: '#1e3a8a', // blue-900
+  plumber: '#2563eb', // blue-600
+  electrician: '#0ea5e9', // sky-500
+  business: '#1d4ed8', // blue-700
+  individual: '#93c5fd', // blue-300
+  institution: '#0369a1', // sky-700
 };
 
-/** Chart surface defaults — grid, axis and tooltip styling in one place. */
-export const CHART_GRID = '#e2e8f0'; // slate-200
-export const CHART_AXIS = '#94a3b8'; // slate-400
+// ---- Chart surface tokens ----
+// CSS variables so charts restyle themselves in dark mode with no prop
+// drilling — the <html class="dark"> switch flips them via index.css.
+
+export const CHART_GRID = 'var(--color-line)'; // grid + axis lines
+export const CHART_AXIS = 'var(--color-ink-faint)'; // tick text
+export const CHART_LABEL = 'var(--color-ink-soft)'; // emphasised tick text
 export const CHART_TOOLTIP_STYLE: CSSProperties = {
-  backgroundColor: '#ffffff',
-  border: '1px solid #e2e8f0',
+  backgroundColor: 'var(--color-surface)',
+  border: '1px solid var(--color-line)',
   borderRadius: 10,
   fontSize: 12,
-  boxShadow: '0 4px 16px rgba(15, 23, 42, 0.08)',
-  color: '#0f172a',
+  boxShadow: '0 4px 16px rgba(2, 8, 30, 0.18)',
+  color: 'var(--color-ink)',
 };
+
+/** Semantic accents kept out of the blue family on purpose. */
+export const ALERT_AMBER = '#d97706'; // stale / caution
+export const ALERT_ROSE = '#e11d48'; // overdue / no stock
+export const SUCCESS_BLUE = '#1d4ed8'; // "best delivered" — stays in family
+export const SUCCESS_BLUE_SOFT = '#93c5fd';

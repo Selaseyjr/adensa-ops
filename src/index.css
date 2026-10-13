@@ -1,7 +1,47 @@
 @import "tailwindcss";
 
+/* Class-based dark mode: <html class="dark"> flips every token below. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  /* ---- Brand blues: one family, wide, visible steps ---- */
+  --color-brand-50: #eff6ff;
+  --color-brand-100: #dbeafe;
+  --color-brand-200: #bfdbfe;
+  --color-brand-300: #93c5fd;
+  --color-brand-400: #60a5fa;
+  --color-brand-500: #3b82f6;
+  --color-brand-600: #2563eb;
+  --color-brand-700: #1d4ed8;
+  --color-brand-800: #1e40af;
+  --color-brand-900: #1e3a8a;
+  --color-brand-950: #172554;
+
+  /* ---- Semantic surfaces: flip under .dark ---- */
+  --color-canvas: #f2f6fc;
+  --color-surface: #ffffff;
+  --color-subtle: #f6f9fd;
+  --color-track: #e3ecf8;
+  --color-ink: #12224a;
+  --color-ink-soft: #41526f;
+  --color-ink-faint: #7787a3;
+  --color-line: #dde6f2;
+  --color-line-strong: #c3d3ea;
+}
+
+/* Unlayered rules beat Tailwind's @layer theme — .dark always wins. */
+.dark {
+  --color-canvas: #080e1c;
+  --color-surface: #111b31;
+  --color-subtle: #16233f;
+  --color-track: #1d2c4d;
+  --color-ink: #eaf0fb;
+  --color-ink-soft: #b3c1da;
+  --color-ink-faint: #7a8aa8;
+  --color-line: #21304f;
+  --color-line-strong: #32456b;
 }
 
 html,
@@ -13,8 +53,8 @@ body,
 body {
   margin: 0;
   font-family: var(--font-sans);
-  background-color: #f8fafc;
-  color: #0f172a;
+  background-color: var(--color-canvas);
+  color: var(--color-ink);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -24,11 +64,12 @@ body {
   font-family: var(--font-sans);
   border-radius: 0.75rem;
   z-index: 0;
+  background: var(--color-subtle);
 }
 
 .leaflet-popup-content-wrapper {
   border-radius: 10px;
-  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.14);
+  box-shadow: 0 10px 30px rgba(2, 8, 30, 0.18);
   font-size: 12px;
   line-height: 1.5;
 }
@@ -38,11 +79,46 @@ body {
 }
 
 .leaflet-popup-tip {
-  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.14);
+  box-shadow: 0 10px 30px rgba(2, 8, 30, 0.18);
 }
 
 .leaflet-bar a {
   border-radius: 6px !important;
   border: none !important;
-  color: #334155 !important;
+}
+
+/* ---- Dark-mode Leaflet: night chrome + keyless night tiles ----
+   CARTO's dark_all now requires an API key, so we invert the OSM tiles
+   with a filter instead — no key, no cost, no watermark. ---- */
+.dark .leaflet-tile {
+  filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.9);
+}
+
+.dark .leaflet-popup-content-wrapper,
+.dark .leaflet-popup-tip {
+  background: var(--color-surface);
+}
+
+.dark .leaflet-bar a {
+  background: var(--color-subtle);
+  color: var(--color-ink-soft);
+  border-bottom: 1px solid var(--color-line) !important;
+}
+
+.dark .leaflet-bar a:hover {
+  background: var(--color-track);
+  color: var(--color-ink);
+}
+
+.dark .leaflet-control-attribution {
+  background: rgba(17, 27, 49, 0.82);
+  color: var(--color-ink-faint);
+}
+
+.dark .leaflet-control-attribution a {
+  color: var(--color-brand-400);
+}
+
+.leaflet-control-attribution {
+  background: rgba(255, 255, 255, 0.82);
 }

@@ -26,13 +26,17 @@ import {
 } from 'lucide-react'
 import type { DataMode, Dataset } from './lib/dataSource'
 import {
+  ALERT_AMBER,
   CATEGORY_COLORS,
   CATEGORY_SHORT,
   CHART_AXIS,
   CHART_GRID,
+  CHART_LABEL,
   CHART_TOOLTIP_STYLE,
   CUSTOMER_TYPE_COLORS,
   STATUS_COLORS,
+  SUCCESS_BLUE,
+  SUCCESS_BLUE_SOFT,
 } from './lib/colors'
 import { ChartCard, CategoryBars, DonutChart, type DonutSlice } from './components/charts'
 import { SupplierMap } from './components/SupplierMap'
@@ -48,6 +52,9 @@ import {
 
 const CATEGORIES: Category[] = ['cement', 'plumbing', 'electrical', 'safety', 'tools']
 const STATUSES: ProspectStatus[] = ['identified', 'contacted', 'vetted']
+
+/** Minimum table width — inside overflow-x-auto so the PAGE never scrolls sideways. */
+const TABLE_MIN_W = 'min-w-[680px]'
 
 function ghs(n: number): string {
   return `GH¢${n.toLocaleString('en-GH')}`
@@ -99,22 +106,22 @@ function StatCard({
   alert?: boolean
 }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex items-start justify-between">
-        <div>
-          <div className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</div>
-          <div className={`mt-1 text-2xl font-bold ${alert ? 'text-rose-600' : 'text-slate-900'}`}>
+    <div className="min-w-0 rounded-xl border border-line bg-surface p-4 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-xs font-medium uppercase tracking-wide text-ink-faint">{label}</div>
+          <div className={`mt-1 text-2xl font-bold ${alert ? 'text-rose-600 dark:text-rose-400' : 'text-ink'}`}>
             {value}
           </div>
         </div>
         <div
-          className="flex h-9 w-9 items-center justify-center rounded-lg"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
           style={{ backgroundColor: `${tone}16`, color: tone }}
         >
           <Icon size={18} />
         </div>
       </div>
-      {sub && <div className="mt-1 text-xs text-slate-500">{sub}</div>}
+      {sub && <div className="mt-1 text-xs text-ink-faint">{sub}</div>}
     </div>
   )
 }
@@ -123,7 +130,7 @@ function MapLegend() {
   return (
     <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5">
       {CATEGORIES.map((cat) => (
-        <span key={cat} className="flex items-center gap-1.5 text-[11px] text-slate-600">
+        <span key={cat} className="flex items-center gap-1.5 text-[11px] text-ink-soft">
           <span
             className="inline-block h-2.5 w-2.5 rounded-full"
             style={{ backgroundColor: CATEGORY_COLORS[cat] }}
@@ -131,7 +138,7 @@ function MapLegend() {
           {CATEGORY_LABELS[cat]}
         </span>
       ))}
-      <span className="ml-auto text-[10px] text-slate-400">
+      <span className="ml-auto text-[10px] text-ink-faint">
         Approximate area positions &middot; &copy; OpenStreetMap
       </span>
     </div>
@@ -156,9 +163,10 @@ export function DashboardPage({ data, mode }: { data: Dataset; mode: DataMode })
     color: STATUS_COLORS[st],
   }))
 
+  // Fresh = in-family blue; stale = amber, because staleness IS an alert.
   const freshnessSlices: DonutSlice[] = [
-    { name: 'Fresh', value: freshCount, color: '#059669' },
-    { name: `Older than ${PRICE_STALE_DAYS} days`, value: staleCount, color: '#f59e0b' },
+    { name: 'Fresh', value: freshCount, color: '#2563eb' },
+    { name: `Older than ${PRICE_STALE_DAYS} days`, value: staleCount, color: ALERT_AMBER },
   ]
 
   const categoryBars = CATEGORIES.map((cat) => ({
@@ -187,21 +195,21 @@ export function DashboardPage({ data, mode }: { data: Dataset; mode: DataMode })
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           icon={Factory}
-          tone="#4f46e5"
+          tone="#2563eb"
           label="Suppliers"
           value={data.suppliers.length}
           sub={`${vetted} vetted · ${data.suppliers.length - vetted} in pipeline`}
         />
         <StatCard
           icon={Users}
-          tone="#0284c7"
+          tone="#0ea5e9"
           label="Customers"
           value={data.customers.length}
           sub="From discovery research"
         />
         <StatCard
           icon={Tag}
-          tone="#059669"
+          tone="#1d4ed8"
           label="Quoted prices"
           value={quotedCount}
           sub={
@@ -212,7 +220,7 @@ export function DashboardPage({ data, mode }: { data: Dataset; mode: DataMode })
         />
         <StatCard
           icon={AlertTriangle}
-          tone="#f59e0b"
+          tone={ALERT_AMBER}
           label="Stale prices"
           value={staleCount}
           sub={`Older than ${PRICE_STALE_DAYS} days — refresh before quoting`}
@@ -242,72 +250,74 @@ export function DashboardPage({ data, mode }: { data: Dataset; mode: DataMode })
         sub="Observations captured per day — supplier quotes vs market references"
       >
         {timeline.length === 0 ? (
-          <div className="flex h-48 items-center justify-center text-xs text-slate-400">
+          <div className="flex h-48 items-center justify-center text-xs text-ink-faint">
             No price observations yet.
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height={200}>
-            <AreaChart data={timeline} margin={{ top: 8, right: 8, left: -22, bottom: 0 }}>
-              <defs>
-                <linearGradient id="gradQuoted" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#0284c7" stopOpacity={0.35} />
-                  <stop offset="100%" stopColor="#0284c7" stopOpacity={0.02} />
-                </linearGradient>
-                <linearGradient id="gradRef" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#d97706" stopOpacity={0.35} />
-                  <stop offset="100%" stopColor="#d97706" stopOpacity={0.02} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} vertical={false} />
-              <XAxis
-                dataKey="date"
-                tick={{ fill: CHART_AXIS, fontSize: 11 }}
-                axisLine={{ stroke: CHART_GRID }}
-                tickLine={false}
-                tickFormatter={(v: string) =>
-                  new Date(`${v}T00:00:00`).toLocaleDateString('en-GB', {
-                    day: 'numeric',
-                    month: 'short',
-                  })
-                }
-              />
-              <YAxis
-                tick={{ fill: CHART_AXIS, fontSize: 11 }}
-                axisLine={false}
-                tickLine={false}
-                allowDecimals={false}
-                width={44}
-              />
-              <Tooltip
-                contentStyle={CHART_TOOLTIP_STYLE}
-                labelFormatter={(label) =>
-                  new Date(`${label}T00:00:00`).toLocaleDateString('en-GB', {
-                    day: 'numeric',
-                    month: 'short',
-                    year: 'numeric',
-                  })
-                }
-              />
-              <Area
-                type="monotone"
-                dataKey="quoted"
-                name="Quoted prices"
-                stackId="1"
-                stroke="#0284c7"
-                strokeWidth={2}
-                fill="url(#gradQuoted)"
-              />
-              <Area
-                type="monotone"
-                dataKey="reference"
-                name="Market references"
-                stackId="1"
-                stroke="#d97706"
-                strokeWidth={2}
-                fill="url(#gradRef)"
-              />
-            </AreaChart>
-          </ResponsiveContainer>
+          <div className="min-w-0">
+            <ResponsiveContainer width="100%" height={200}>
+              <AreaChart data={timeline} margin={{ top: 8, right: 8, left: -22, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="gradQuoted" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#2563eb" stopOpacity={0.35} />
+                    <stop offset="100%" stopColor="#2563eb" stopOpacity={0.02} />
+                  </linearGradient>
+                  <linearGradient id="gradRef" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={ALERT_AMBER} stopOpacity={0.35} />
+                    <stop offset="100%" stopColor={ALERT_AMBER} stopOpacity={0.02} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} vertical={false} />
+                <XAxis
+                  dataKey="date"
+                  tick={{ fill: CHART_AXIS, fontSize: 11 }}
+                  axisLine={{ stroke: CHART_GRID }}
+                  tickLine={false}
+                  tickFormatter={(v: string) =>
+                    new Date(`${v}T00:00:00`).toLocaleDateString('en-GB', {
+                      day: 'numeric',
+                      month: 'short',
+                    })
+                  }
+                />
+                <YAxis
+                  tick={{ fill: CHART_AXIS, fontSize: 11 }}
+                  axisLine={false}
+                  tickLine={false}
+                  allowDecimals={false}
+                  width={44}
+                />
+                <Tooltip
+                  contentStyle={CHART_TOOLTIP_STYLE}
+                  labelFormatter={(label) =>
+                    new Date(`${label}T00:00:00`).toLocaleDateString('en-GB', {
+                      day: 'numeric',
+                      month: 'short',
+                      year: 'numeric',
+                    })
+                  }
+                />
+                <Area
+                  type="monotone"
+                  dataKey="quoted"
+                  name="Quoted prices"
+                  stackId="1"
+                  stroke="#2563eb"
+                  strokeWidth={2}
+                  fill="url(#gradQuoted)"
+                />
+                <Area
+                  type="monotone"
+                  dataKey="reference"
+                  name="Market references"
+                  stackId="1"
+                  stroke={ALERT_AMBER}
+                  strokeWidth={2}
+                  fill="url(#gradRef)"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
         )}
       </ChartCard>
 
@@ -336,13 +346,13 @@ export function DashboardPage({ data, mode }: { data: Dataset; mode: DataMode })
               const pct = total === 0 ? 0 : Math.round((covered / total) * 100)
               return (
                 <div key={cat}>
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-medium text-slate-700">{CATEGORY_LABELS[cat]}</span>
-                    <span className="text-slate-500">
+                  <div className="flex items-center justify-between gap-2 text-xs">
+                    <span className="truncate font-medium text-ink">{CATEGORY_LABELS[cat]}</span>
+                    <span className="shrink-0 text-ink-faint">
                       {covered}/{total}
                     </span>
                   </div>
-                  <div className="mt-1.5 h-2 rounded-full bg-slate-100">
+                  <div className="mt-1.5 h-2 rounded-full bg-track">
                     <div
                       className="h-2 rounded-full transition-all duration-500"
                       style={{ width: `${pct}%`, backgroundColor: CATEGORY_COLORS[cat] }}
@@ -351,7 +361,7 @@ export function DashboardPage({ data, mode }: { data: Dataset; mode: DataMode })
                 </div>
               )
             })}
-            <p className="pt-1 text-[11px] leading-relaxed text-slate-400">
+            <p className="pt-1 text-[11px] leading-relaxed text-ink-faint">
               {mode === 'real'
                 ? 'Coverage fills as supplier quotes are captured during onboarding calls.'
                 : `${data.products.length - coveredProducts} product(s) still without a demo quote.`}
@@ -375,25 +385,25 @@ export function DashboardPage({ data, mode }: { data: Dataset; mode: DataMode })
                 return (
                   <div
                     key={`${p.productId}-${p.capturedOn}-${i}`}
-                    className="rounded-lg border border-slate-200 bg-slate-50 p-3"
+                    className="min-w-0 rounded-lg border border-line bg-subtle p-3"
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <div className="text-xs font-medium text-slate-800">
+                      <div className="min-w-0 text-xs font-medium text-ink">
                         {product ? `${product.brand} — ${product.name}` : p.productId}
                       </div>
-                      <div className="text-sm font-bold text-slate-900">{ghs(p.ghs)}</div>
+                      <div className="shrink-0 text-sm font-bold text-ink">{ghs(p.ghs)}</div>
                     </div>
-                    <div className="mt-1.5 flex items-center gap-2 text-[11px] text-slate-500">
+                    <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[11px] text-ink-faint">
                       <CalendarClock size={12} />
                       {p.capturedOn}
                       {stale && (
-                        <span className="rounded-full bg-amber-100 px-1.5 py-0.5 font-medium text-amber-800">
+                        <span className="rounded-full bg-amber-100 px-1.5 py-0.5 font-medium text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">
                           {daysSince(p.capturedOn)}d old
                         </span>
                       )}
                     </div>
                     {p.source && (
-                      <div className="mt-1 truncate text-[11px] text-slate-400" title={p.source}>
+                      <div className="mt-1 truncate text-[11px] text-ink-faint" title={p.source}>
                         {p.source}
                       </div>
                     )}
@@ -422,21 +432,21 @@ export function SuppliersPage({ data }: { data: Dataset }) {
 
   return (
     <div className="space-y-5">
-      {/* Pipeline mini-stats */}
-      <div className="grid grid-cols-3 gap-4">
+      {/* Pipeline mini-stats — stacks on phones, three-up from sm */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         {pipelineCounts.map((p) => (
           <div
             key={p.label}
-            className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+            className="min-w-0 rounded-xl border border-line bg-surface p-4 shadow-sm"
           >
-            <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
+            <div className="flex items-center gap-2 text-xs font-medium text-ink-faint">
               <span
                 className="inline-block h-2 w-2 rounded-full"
                 style={{ backgroundColor: p.color }}
               />
               {p.label}
             </div>
-            <div className="mt-1 text-2xl font-bold text-slate-900">{p.value}</div>
+            <div className="mt-1 text-2xl font-bold text-ink">{p.value}</div>
           </div>
         ))}
       </div>
@@ -463,9 +473,9 @@ export function SuppliersPage({ data }: { data: Dataset }) {
         })}
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
-        <table className="w-full text-left text-sm">
-          <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+      <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
+        <table className={`w-full text-left text-sm ${TABLE_MIN_W}`}>
+          <thead className="border-b border-line bg-subtle text-xs uppercase tracking-wide text-ink-faint">
             <tr>
               <th className="px-4 py-3">Supplier</th>
               <th className="px-4 py-3">Category</th>
@@ -476,20 +486,20 @@ export function SuppliersPage({ data }: { data: Dataset }) {
               <th className="px-4 py-3">Prices captured</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-line">
             {rows.map((s) => {
               const prices = data.prices.filter((p) => p.supplierId === s.id)
               const stale = prices.some((p) => isPriceStale(p))
               return (
-                <tr key={s.id} className="transition hover:bg-slate-50">
+                <tr key={s.id} className="transition hover:bg-subtle">
                   <td className="px-4 py-3">
-                    <div className="font-medium text-slate-900">{s.name}</div>
+                    <div className="font-medium text-ink">{s.name}</div>
                     {s.source && (
                       <a
                         href={s.source}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-[11px] text-sky-600 hover:underline"
+                        className="text-[11px] text-brand-600 hover:underline dark:text-brand-400"
                       >
                         source &#8599;
                       </a>
@@ -498,17 +508,17 @@ export function SuppliersPage({ data }: { data: Dataset }) {
                   <td className="px-4 py-3">
                     <CategoryChip category={s.category} />
                   </td>
-                  <td className="px-4 py-3 text-slate-600">
+                  <td className="px-4 py-3 text-ink-soft">
                     <div className="flex items-start gap-1.5">
-                      <MapPin size={13} className="mt-0.5 shrink-0 text-slate-400" />
+                      <MapPin size={13} className="mt-0.5 shrink-0 text-ink-faint" />
                       <div>
                         {s.location}
-                        <div className="text-[11px] text-slate-400">{s.city}</div>
+                        <div className="text-[11px] text-ink-faint">{s.city}</div>
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-slate-600">
-                    {s.phone ?? s.whatsapp ?? <span className="text-slate-400">not captured yet</span>}
+                  <td className="px-4 py-3 text-ink-soft">
+                    {s.phone ?? s.whatsapp ?? <span className="text-ink-faint">not captured yet</span>}
                   </td>
                   <td className="px-4 py-3">
                     <StatusChip status={s.status} />
@@ -521,25 +531,25 @@ export function SuppliersPage({ data }: { data: Dataset }) {
                             key={i}
                             size={13}
                             className={
-                              i < s.reliability! ? 'fill-amber-400 text-amber-400' : 'text-slate-200'
+                              i < s.reliability! ? 'fill-amber-400 text-amber-400' : 'text-track'
                             }
                           />
                         ))}
                       </span>
                     ) : (
-                      <span className="text-xs text-slate-400">
+                      <span className="text-xs text-ink-faint">
                         {s.status === 'vetted' ? '—' : 'earned through orders'}
                       </span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-slate-600">
+                  <td className="px-4 py-3 text-ink-soft">
                     {prices.length === 0 ? (
-                      <span className="text-slate-400">awaiting first quote</span>
+                      <span className="text-ink-faint">awaiting first quote</span>
                     ) : (
                       <span>
                         {prices.length}
                         {stale && (
-                          <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800">
+                          <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">
                             stale
                           </span>
                         )}
@@ -551,7 +561,7 @@ export function SuppliersPage({ data }: { data: Dataset }) {
             })}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-10 text-center text-slate-400">
+                <td colSpan={7} className="px-4 py-10 text-center text-ink-faint">
                   No suppliers in this category yet.
                 </td>
               </tr>
@@ -569,8 +579,8 @@ function FilterChip({ active, onClick, label }: { active: boolean; onClick: () =
       onClick={onClick}
       className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
         active
-          ? 'border-indigo-600 bg-indigo-600 text-white shadow-sm'
-          : 'border-slate-300 bg-white text-slate-600 hover:border-slate-400'
+          ? 'border-brand-600 bg-brand-600 text-white shadow-sm'
+          : 'border-line-strong bg-surface text-ink-soft hover:border-brand-400 hover:text-ink'
       }`}
     >
       {label}
@@ -587,7 +597,7 @@ export function CustomersPage({ data }: { data: Dataset }) {
     return [...counts.entries()].map(([type, value]) => ({
       name: type.charAt(0).toUpperCase() + type.slice(1),
       value,
-      color: CUSTOMER_TYPE_COLORS[type] ?? '#64748b',
+      color: CUSTOMER_TYPE_COLORS[type] ?? '#60a5fa',
     }))
   }, [data])
 
@@ -608,40 +618,42 @@ export function CustomersPage({ data }: { data: Dataset }) {
           sub="How many customers need each category"
           className="lg:col-span-2"
         >
-          <ResponsiveContainer width="100%" height={210}>
-            <BarChart data={demandBars} margin={{ top: 8, right: 8, left: -22, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} vertical={false} />
-              <XAxis
-                dataKey="label"
-                tick={{ fill: CHART_AXIS, fontSize: 11 }}
-                axisLine={{ stroke: CHART_GRID }}
-                tickLine={false}
-              />
-              <YAxis
-                tick={{ fill: CHART_AXIS, fontSize: 11 }}
-                axisLine={false}
-                tickLine={false}
-                allowDecimals={false}
-                width={44}
-              />
-              <Tooltip
-                contentStyle={CHART_TOOLTIP_STYLE}
-                cursor={{ fill: 'rgba(148, 163, 184, 0.12)' }}
-                formatter={(value) => [`${value} customer${Number(value) === 1 ? '' : 's'}`, 'Need']}
-              />
-              <Bar dataKey="value" radius={[6, 6, 0, 0]} maxBarSize={56}>
-                {demandBars.map((d) => (
-                  <Cell key={d.label} fill={d.color} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+          <div className="min-w-0">
+            <ResponsiveContainer width="100%" height={210}>
+              <BarChart data={demandBars} margin={{ top: 8, right: 8, left: -22, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} vertical={false} />
+                <XAxis
+                  dataKey="label"
+                  tick={{ fill: CHART_AXIS, fontSize: 11 }}
+                  axisLine={{ stroke: CHART_GRID }}
+                  tickLine={false}
+                />
+                <YAxis
+                  tick={{ fill: CHART_AXIS, fontSize: 11 }}
+                  axisLine={false}
+                  tickLine={false}
+                  allowDecimals={false}
+                  width={44}
+                />
+                <Tooltip
+                  contentStyle={CHART_TOOLTIP_STYLE}
+                  cursor={{ fill: 'rgba(96, 165, 250, 0.12)' }}
+                  formatter={(value) => [`${value} customer${Number(value) === 1 ? '' : 's'}`, 'Need']}
+                />
+                <Bar dataKey="value" radius={[6, 6, 0, 0]} maxBarSize={56}>
+                  {demandBars.map((d) => (
+                    <Cell key={d.label} fill={d.color} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </ChartCard>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
-        <table className="w-full text-left text-sm">
-          <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+      <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
+        <table className={`w-full text-left text-sm ${TABLE_MIN_W}`}>
+          <thead className="border-b border-line bg-subtle text-xs uppercase tracking-wide text-ink-faint">
             <tr>
               <th className="px-4 py-3">Customer</th>
               <th className="px-4 py-3">Type</th>
@@ -650,15 +662,15 @@ export function CustomersPage({ data }: { data: Dataset }) {
               <th className="px-4 py-3">Next follow-up</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-line">
             {data.customers.map((c) => (
-              <tr key={c.id} className="transition hover:bg-slate-50">
+              <tr key={c.id} className="transition hover:bg-subtle">
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2.5">
                     <span
                       className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white"
                       style={{
-                        backgroundColor: CUSTOMER_TYPE_COLORS[c.type] ?? '#64748b',
+                        backgroundColor: CUSTOMER_TYPE_COLORS[c.type] ?? '#60a5fa',
                       }}
                     >
                       {c.name
@@ -667,16 +679,16 @@ export function CustomersPage({ data }: { data: Dataset }) {
                         .slice(0, 2)
                         .join('')}
                     </span>
-                    <div>
-                      <div className="font-medium text-slate-900">{c.name}</div>
+                    <div className="min-w-0">
+                      <div className="font-medium text-ink">{c.name}</div>
                       {c.contactPerson && (
-                        <div className="text-[11px] text-slate-500">{c.contactPerson}</div>
+                        <div className="text-[11px] text-ink-faint">{c.contactPerson}</div>
                       )}
                     </div>
                   </div>
                 </td>
-                <td className="px-4 py-3 capitalize text-slate-600">{c.type}</td>
-                <td className="px-4 py-3 text-slate-600">{c.city}</td>
+                <td className="px-4 py-3 capitalize text-ink-soft">{c.type}</td>
+                <td className="px-4 py-3 text-ink-soft">{c.city}</td>
                 <td className="px-4 py-3">
                   <div className="flex flex-wrap gap-1">
                     {c.productsNeeded.map((p) => (
@@ -691,7 +703,7 @@ export function CustomersPage({ data }: { data: Dataset }) {
             ))}
             {data.customers.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-10 text-center text-slate-400">
+                <td colSpan={5} className="px-4 py-10 text-center text-ink-faint">
                   No customer records yet.
                 </td>
               </tr>
@@ -704,25 +716,25 @@ export function CustomersPage({ data }: { data: Dataset }) {
 }
 
 function FollowUpCell({ date }: { date?: string }) {
-  if (!date) return <span className="text-slate-400">—</span>
+  if (!date) return <span className="text-ink-faint">—</span>
   const days = -daysSince(date)
   let chip = null
   if (days < 0) {
     chip = (
-      <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-medium text-rose-700">
+      <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-medium text-rose-700 dark:bg-rose-950/60 dark:text-rose-300">
         overdue
       </span>
     )
   } else if (days <= 7) {
     chip = (
-      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800">
+      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">
         due in {days}d
       </span>
     )
   }
   return (
     <div className="flex items-center gap-2">
-      <span className="text-slate-700">{date}</span>
+      <span className="text-ink">{date}</span>
       {chip}
     </div>
   )
@@ -746,12 +758,12 @@ export function ComparePage({ data }: { data: Dataset }) {
 
   if (productIdsWithQuotes.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-slate-300 bg-white p-12 text-center">
-        <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-slate-100 text-slate-400">
+      <div className="rounded-xl border border-dashed border-line-strong bg-surface p-12 text-center">
+        <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-subtle text-ink-faint">
           <PackageSearch size={20} />
         </div>
-        <div className="text-sm font-medium text-slate-700">No quoted prices captured yet</div>
-        <p className="mx-auto mt-2 max-w-md text-xs leading-relaxed text-slate-500">
+        <div className="text-sm font-medium text-ink">No quoted prices captured yet</div>
+        <p className="mx-auto mt-2 max-w-md text-xs leading-relaxed text-ink-soft">
           The comparison screen fills in the moment the first supplier quotes arrive. In real mode
           that happens during supplier onboarding calls; the demo dataset already has captures to
           show how it works.
@@ -776,7 +788,8 @@ export function ComparePage({ data }: { data: Dataset }) {
       ? reference.reduce((sum, r) => sum + r.ghs, 0) / reference.length
       : undefined
 
-  // Stacked unit + transport bars per supplier.
+  // Stacked unit + transport bars per supplier. Best row goes deep navy so
+  // "the winner" reads instantly without leaving the blue family.
   const chartData = rows.map((r) => ({
     name: (r.supplier?.name ?? 'Unknown').split(' ')[0],
     unit: r.quote.ghs,
@@ -787,11 +800,11 @@ export function ComparePage({ data }: { data: Dataset }) {
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-3">
-        <label className="text-xs font-medium text-slate-600">Product</label>
+        <label className="text-xs font-medium text-ink-soft">Product</label>
         <select
           value={selected}
           onChange={(e) => setSelected(e.target.value)}
-          className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-800 shadow-sm"
+          className="min-w-0 max-w-full rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-sm text-ink shadow-sm"
         >
           {productIdsWithQuotes.map((p) => (
             <option key={p.id} value={p.id}>
@@ -800,7 +813,7 @@ export function ComparePage({ data }: { data: Dataset }) {
           ))}
         </select>
         {product && (
-          <span className="text-xs text-slate-500">
+          <span className="text-xs text-ink-faint">
             Unit: {product.unit} · Like-for-like spec comparison only
           </span>
         )}
@@ -812,79 +825,81 @@ export function ComparePage({ data }: { data: Dataset }) {
         sub="Unit price + transport per supplier"
         action={
           rows.length > 1 && worstTotal > bestTotal ? (
-            <div className="rounded-lg bg-emerald-50 px-3 py-1.5 text-right">
-              <div className="text-[10px] font-medium uppercase tracking-wide text-emerald-600">
+            <div className="rounded-lg bg-brand-50 px-3 py-1.5 text-right dark:bg-brand-950/50">
+              <div className="text-[10px] font-medium uppercase tracking-wide text-brand-700 dark:text-brand-300">
                 Best saves
               </div>
-              <div className="text-sm font-bold text-emerald-700">
+              <div className="text-sm font-bold text-brand-800 dark:text-brand-200">
                 {ghs(worstTotal - bestTotal)} ({Math.round(((worstTotal - bestTotal) / worstTotal) * 100)}%)
               </div>
             </div>
           ) : undefined
         }
       >
-        <ResponsiveContainer width="100%" height={Math.max(160, rows.length * 56)}>
-          <BarChart
-            data={chartData}
-            layout="vertical"
-            margin={{ top: 4, right: 16, left: 8, bottom: 0 }}
-          >
-            <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} horizontal={false} />
-            <XAxis
-              type="number"
-              tick={{ fill: CHART_AXIS, fontSize: 11 }}
-              axisLine={{ stroke: CHART_GRID }}
-              tickLine={false}
-              tickFormatter={(v: number) => ghs(v)}
-            />
-            <YAxis
-              type="category"
-              dataKey="name"
-              tick={{ fill: '#334155', fontSize: 12, fontWeight: 500 }}
-              axisLine={false}
-              tickLine={false}
-              width={80}
-            />
-            <Tooltip
-              contentStyle={CHART_TOOLTIP_STYLE}
-              cursor={{ fill: 'rgba(148, 163, 184, 0.10)' }}
-              formatter={(value, name) => [ghs(Number(value)), name === 'unit' ? 'Unit price' : 'Transport']}
-            />
-            {refAvg !== undefined && (
-              <ReferenceLine
-                x={refAvg}
-                stroke="#d97706"
-                strokeDasharray="5 4"
-                label={{
-                  value: `Market ref ${ghs(Math.round(refAvg))}`,
-                  position: 'top',
-                  fill: '#b45309',
-                  fontSize: 10,
-                }}
+        <div className="min-w-0">
+          <ResponsiveContainer width="100%" height={Math.max(160, rows.length * 56)}>
+            <BarChart
+              data={chartData}
+              layout="vertical"
+              margin={{ top: 4, right: 16, left: 8, bottom: 0 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} horizontal={false} />
+              <XAxis
+                type="number"
+                tick={{ fill: CHART_AXIS, fontSize: 11 }}
+                axisLine={{ stroke: CHART_GRID }}
+                tickLine={false}
+                tickFormatter={(v: number) => ghs(v)}
               />
-            )}
-            <Bar dataKey="unit" name="unit" stackId="cost" radius={[0, 0, 0, 0]}>
-              {chartData.map((d) => (
-                <Cell key={d.name} fill={d.best ? '#059669' : '#0284c7'} />
-              ))}
-            </Bar>
-            <Bar dataKey="transport" name="transport" stackId="cost" radius={[0, 6, 6, 0]}>
-              {chartData.map((d) => (
-                <Cell key={d.name} fill={d.best ? '#34d399' : '#7dd3fc'} />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-        <div className="mt-3 flex items-center gap-4 text-[11px] text-slate-500">
+              <YAxis
+                type="category"
+                dataKey="name"
+                tick={{ fill: CHART_LABEL, fontSize: 12, fontWeight: 500 }}
+                axisLine={false}
+                tickLine={false}
+                width={80}
+              />
+              <Tooltip
+                contentStyle={CHART_TOOLTIP_STYLE}
+                cursor={{ fill: 'rgba(96, 165, 250, 0.10)' }}
+                formatter={(value, name) => [ghs(Number(value)), name === 'unit' ? 'Unit price' : 'Transport']}
+              />
+              {refAvg !== undefined && (
+                <ReferenceLine
+                  x={refAvg}
+                  stroke={ALERT_AMBER}
+                  strokeDasharray="5 4"
+                  label={{
+                    value: `Market ref ${ghs(Math.round(refAvg))}`,
+                    position: 'top',
+                    fill: '#f59e0b',
+                    fontSize: 10,
+                  }}
+                />
+              )}
+              <Bar dataKey="unit" name="unit" stackId="cost" radius={[0, 0, 0, 0]}>
+                {chartData.map((d) => (
+                  <Cell key={d.name} fill={d.best ? SUCCESS_BLUE : '#2563eb'} />
+                ))}
+              </Bar>
+              <Bar dataKey="transport" name="transport" stackId="cost" radius={[0, 6, 6, 0]}>
+                {chartData.map((d) => (
+                  <Cell key={d.name} fill={d.best ? '#60a5fa' : SUCCESS_BLUE_SOFT} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] text-ink-faint">
           <span className="flex items-center gap-1.5">
-            <span className="inline-block h-2.5 w-2.5 rounded-sm bg-sky-600" /> Unit price
+            <span className="inline-block h-2.5 w-2.5 rounded-sm bg-brand-600" /> Unit price
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="inline-block h-2.5 w-2.5 rounded-sm bg-sky-300" /> Transport
+            <span className="inline-block h-2.5 w-2.5 rounded-sm bg-brand-300" /> Transport
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="inline-block h-2.5 w-2.5 rounded-sm bg-emerald-600" /> Best delivered
-            (green)
+            <span className="inline-block h-2.5 w-2.5 rounded-sm bg-brand-900" /> Best delivered
+            (deep blue)
           </span>
           {refAvg !== undefined && (
             <span className="flex items-center gap-1.5">
@@ -896,9 +911,9 @@ export function ComparePage({ data }: { data: Dataset }) {
       </ChartCard>
 
       {/* Full table */}
-      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
-        <table className="w-full text-left text-sm">
-          <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+      <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
+        <table className={`w-full text-left text-sm ${TABLE_MIN_W}`}>
+          <thead className="border-b border-line bg-subtle text-xs uppercase tracking-wide text-ink-faint">
             <tr>
               <th className="px-4 py-3">Supplier</th>
               <th className="px-4 py-3">Unit price</th>
@@ -909,60 +924,62 @@ export function ComparePage({ data }: { data: Dataset }) {
               <th className="px-4 py-3">Stock</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-line">
             {rows.map(({ quote, supplier, total, stale }) => (
               <tr
                 key={`${quote.supplierId}-${quote.productId}`}
                 className={
-                  total === bestTotal ? 'bg-emerald-50/60' : 'transition hover:bg-slate-50'
+                  total === bestTotal
+                    ? 'bg-brand-50/70 dark:bg-brand-950/40'
+                    : 'transition hover:bg-subtle'
                 }
               >
                 <td className="px-4 py-3">
-                  <div className="font-medium text-slate-900">{supplier?.name ?? 'Unknown supplier'}</div>
+                  <div className="font-medium text-ink">{supplier?.name ?? 'Unknown supplier'}</div>
                   {supplier?.status && (
                     <div className="mt-0.5">
                       <StatusChip status={supplier.status} />
                     </div>
                   )}
                 </td>
-                <td className="px-4 py-3 text-slate-700">{ghs(quote.ghs)}</td>
-                <td className="px-4 py-3 text-slate-700">
+                <td className="px-4 py-3 text-ink">{ghs(quote.ghs)}</td>
+                <td className="px-4 py-3 text-ink">
                   {quote.transportGhs === undefined
                     ? '—'
                     : quote.transportGhs === 0
                       ? 'Free'
                       : ghs(quote.transportGhs)}
                 </td>
-                <td className="px-4 py-3 font-semibold text-slate-900">
+                <td className="px-4 py-3 font-semibold text-ink">
                   {ghs(total)}
                   {total === bestTotal && (
-                    <span className="ml-2 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-800">
+                    <span className="ml-2 rounded-full bg-brand-100 px-2 py-0.5 text-[11px] font-medium text-brand-800 dark:bg-brand-900/60 dark:text-brand-200">
                       best delivered
                     </span>
                   )}
                 </td>
-                <td className="px-4 py-3 text-slate-700">
+                <td className="px-4 py-3 text-ink">
                   {quote.leadTimeDays === undefined ? '—' : `${quote.leadTimeDays}d`}
                 </td>
                 <td className="px-4 py-3">
-                  <div className="text-slate-700">{quote.capturedOn}</div>
+                  <div className="text-ink">{quote.capturedOn}</div>
                   {stale && (
-                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800">
+                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">
                       {daysSince(quote.capturedOn)}d old — refresh
                     </span>
                   )}
                 </td>
                 <td className="px-4 py-3">
                   {quote.inStock === false ? (
-                    <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-medium text-rose-700">
+                    <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-medium text-rose-700 dark:bg-rose-950/60 dark:text-rose-300">
                       no stock
                     </span>
                   ) : quote.inStock ? (
-                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
+                    <span className="rounded-full bg-brand-100 px-2 py-0.5 text-[11px] font-medium text-brand-800 dark:bg-brand-900/60 dark:text-brand-200">
                       in stock
                     </span>
                   ) : (
-                    <span className="text-slate-400">—</span>
+                    <span className="text-ink-faint">—</span>
                   )}
                 </td>
               </tr>
@@ -972,7 +989,7 @@ export function ComparePage({ data }: { data: Dataset }) {
       </div>
 
       {reference.length > 0 && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
           <span className="font-semibold">Market reference:</span>{' '}
           {reference
             .map(
@@ -999,13 +1016,13 @@ export function PlannedPage({
   icon: LucideIcon
 }) {
   return (
-    <div className="rounded-xl border border-dashed border-slate-300 bg-white p-14 text-center">
-      <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-indigo-50 text-indigo-500">
+    <div className="rounded-xl border border-dashed border-line-strong bg-surface p-14 text-center">
+      <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-brand-50 text-brand-600 dark:bg-brand-950/50 dark:text-brand-400">
         <Icon size={22} />
       </div>
-      <div className="text-sm font-semibold text-slate-700">{title} — not built yet</div>
-      <p className="mx-auto mt-2 max-w-md text-xs leading-relaxed text-slate-500">{note}</p>
-      <div className="mx-auto mt-4 flex items-center justify-center gap-1.5 text-[11px] text-slate-400">
+      <div className="text-sm font-semibold text-ink">{title} — not built yet</div>
+      <p className="mx-auto mt-2 max-w-md text-xs leading-relaxed text-ink-soft">{note}</p>
+      <div className="mx-auto mt-4 flex items-center justify-center gap-1.5 text-[11px] text-ink-faint">
         <Building2 size={12} />
         On the Adensa Ops build roadmap
       </div>

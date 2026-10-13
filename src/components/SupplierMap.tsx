@@ -10,6 +10,10 @@ import { CATEGORY_LABELS, type Supplier } from '../types'
  * category. Coordinates are approximated from the area string in each
  * record (see lib/geo) — enough to show geographic spread, not for
  * navigation. Markers open a popup with the supplier's details.
+ *
+ * One tile layer (OSM) only. Dark mode restyles the tiles with a CSS
+ * invert/hue-rotate filter in index.css — keyless, unlike CARTO's
+ * dark_all which now demands an API key.
  */
 export function SupplierMap({
   suppliers,
@@ -36,8 +40,7 @@ export function SupplierMap({
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 18,
-      attribution:
-        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     }).addTo(map)
 
     layerRef.current = L.layerGroup().addTo(map)
@@ -97,7 +100,7 @@ export function SupplierMap({
     <div
       ref={containerRef}
       style={{ height }}
-      className="overflow-hidden rounded-xl border border-slate-200"
+      className="overflow-hidden rounded-xl border border-line"
       role="img"
       aria-label="Map of supplier locations across Ghana"
     />

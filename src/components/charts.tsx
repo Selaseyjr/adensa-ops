@@ -10,9 +10,14 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import { CHART_AXIS, CHART_GRID, CHART_TOOLTIP_STYLE } from '../lib/colors'
+import { CHART_AXIS, CHART_GRID, CHART_LABEL, CHART_TOOLTIP_STYLE } from '../lib/colors'
 
-/** White card shell used around every chart and table. */
+/**
+ * White (surface) card shell used around every chart and table.
+ * min-w-0 is load-bearing: grid/flex children default to min-width:auto,
+ * which lets Recharts' intrinsic width push the page into horizontal
+ * scroll on small screens.
+ */
 export function ChartCard({
   title,
   sub,
@@ -27,15 +32,17 @@ export function ChartCard({
   action?: ReactNode
 }) {
   return (
-    <section className={`rounded-xl border border-slate-200 bg-white p-5 shadow-sm ${className}`}>
+    <section
+      className={`min-w-0 rounded-xl border border-line bg-surface p-5 shadow-sm ${className}`}
+    >
       <header className="flex items-start justify-between gap-3">
-        <div>
-          <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
-          {sub && <p className="mt-0.5 text-xs text-slate-500">{sub}</p>}
+        <div className="min-w-0">
+          <h3 className="text-sm font-semibold text-ink">{title}</h3>
+          {sub && <p className="mt-0.5 text-xs text-ink-faint">{sub}</p>}
         </div>
-        {action}
+        {action && <div className="shrink-0">{action}</div>}
       </header>
-      <div className="mt-4">{children}</div>
+      <div className="mt-4 min-w-0">{children}</div>
     </section>
   )
 }
@@ -61,14 +68,14 @@ export function DonutChart({
 
   if (total === 0) {
     return (
-      <div className="flex h-[180px] items-center justify-center text-xs text-slate-400">
+      <div className="flex h-[180px] items-center justify-center text-xs text-ink-faint">
         No data yet
       </div>
     )
   }
 
   return (
-    <div>
+    <div className="min-w-0">
       <div className="relative" style={{ height }}>
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
@@ -89,9 +96,9 @@ export function DonutChart({
           </PieChart>
         </ResponsiveContainer>
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-          <div className="text-2xl font-bold text-slate-900">{total}</div>
+          <div className="text-2xl font-bold text-ink">{total}</div>
           {centerLabel && (
-            <div className="text-[10px] font-medium uppercase tracking-wide text-slate-400">
+            <div className="text-[10px] font-medium uppercase tracking-wide text-ink-faint">
               {centerLabel}
             </div>
           )}
@@ -99,17 +106,17 @@ export function DonutChart({
       </div>
       <ul className="mt-3 space-y-1.5">
         {visible.map((d) => (
-          <li key={d.name} className="flex items-center justify-between text-xs">
-            <span className="flex items-center gap-2 text-slate-600">
+          <li key={d.name} className="flex items-center justify-between gap-2 text-xs">
+            <span className="flex items-center gap-2 text-ink-soft">
               <span
-                className="inline-block h-2.5 w-2.5 rounded-full"
+                className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
                 style={{ backgroundColor: d.color }}
               />
               {d.name}
             </span>
-            <span className="font-semibold text-slate-900">
+            <span className="shrink-0 font-semibold text-ink">
               {d.value}
-              <span className="ml-1 font-normal text-slate-400">
+              <span className="ml-1 font-normal text-ink-faint">
                 {Math.round((d.value / total) * 100)}%
               </span>
             </span>
@@ -130,33 +137,38 @@ export interface BarDatum {
 export function CategoryBars({ data, height = 190 }: { data: BarDatum[]; height?: number }) {
   const max = Math.max(...data.map((d) => d.value), 1)
   return (
-    <ResponsiveContainer width="100%" height={height}>
-      <BarChart data={data} margin={{ top: 8, right: 8, left: -22, bottom: 0 }}>
-        <XAxis
-          dataKey="label"
-          tick={{ fill: CHART_AXIS, fontSize: 11 }}
-          axisLine={{ stroke: CHART_GRID }}
-          tickLine={false}
-          interval={0}
-        />
-        <YAxis
-          tick={{ fill: CHART_AXIS, fontSize: 11 }}
-          axisLine={false}
-          tickLine={false}
-          allowDecimals={false}
-          domain={[0, max + 1]}
-        />
-        <Tooltip
-          contentStyle={CHART_TOOLTIP_STYLE}
-          cursor={{ fill: 'rgba(148, 163, 184, 0.12)' }}
-          formatter={(value) => [`${value} supplier${Number(value) === 1 ? '' : 's'}`, 'Count']}
-        />
-        <Bar dataKey="value" radius={[6, 6, 0, 0]} maxBarSize={48}>
-          {data.map((d) => (
-            <Cell key={d.label} fill={d.color} />
-          ))}
-        </Bar>
-      </BarChart>
-    </ResponsiveContainer>
+    <div className="min-w-0">
+      <ResponsiveContainer width="100%" height={height}>
+        <BarChart data={data} margin={{ top: 8, right: 8, left: -22, bottom: 0 }}>
+          <XAxis
+            dataKey="label"
+            tick={{ fill: CHART_AXIS, fontSize: 11 }}
+            axisLine={{ stroke: CHART_GRID }}
+            tickLine={false}
+            interval={0}
+          />
+          <YAxis
+            tick={{ fill: CHART_AXIS, fontSize: 11 }}
+            axisLine={false}
+            tickLine={false}
+            allowDecimals={false}
+            domain={[0, max + 1]}
+          />
+          <Tooltip
+            contentStyle={CHART_TOOLTIP_STYLE}
+            cursor={{ fill: 'rgba(96, 165, 250, 0.12)' }}
+            formatter={(value) => [`${value} supplier${Number(value) === 1 ? '' : 's'}`, 'Count']}
+          />
+          <Bar dataKey="value" radius={[6, 6, 0, 0]} maxBarSize={48}>
+            {data.map((d) => (
+              <Cell key={d.label} fill={d.color} />
+            ))}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
   )
 }
+
+/** Re-export so pages can style emphasised axis labels from one place. */
+export { CHART_LABEL }
