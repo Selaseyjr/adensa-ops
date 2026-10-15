@@ -107,3 +107,115 @@ export function daysSince(isoDate: string, asOf: Date = new Date()): number {
 export function isPriceStale(price: Price, asOf?: Date): boolean {
   return daysSince(price.capturedOn, asOf) > PRICE_STALE_DAYS;
 }
+export type OrderStage = 'draft' | 'quoted' | 'deposit' | 'ordered' | 'delivered' | 'settled';
+
+export const ORDER_STAGES: OrderStage[] = [
+  'draft',
+  'quoted',
+  'deposit',
+  'ordered',
+  'delivered',
+  'settled',
+];
+
+export const ORDER_STAGE_LABELS: Record<OrderStage, string> = {
+  draft: 'Draft',
+  quoted: 'Quoted',
+  deposit: 'Deposit paid',
+  ordered: 'Ordered',
+  delivered: 'Delivered',
+  settled: 'Settled',
+};
+
+export interface OrderLine {
+  productId?: string;
+  description: string;
+  qty: number;
+  unitGhs: number;
+}
+
+export interface Order {
+  id: string;
+  customerId: string;
+  lines: OrderLine[];
+  stage: OrderStage;
+  /** Total contract value in GHc. */
+  valueGhs: number;
+  /** Cash received against this order so far. */
+  depositGhs: number;
+  receivedOn: string;
+  expectedDelivery?: string;
+  /** Set when the order reaches delivered or settled. */
+  completedOn?: string;
+  notes?: string;
+}
+
+export type InquiryChannel = 'customer app' | 'phone' | 'whatsapp' | 'walk-in';
+export type InquiryStatus = 'new' | 'quoted' | 'converted' | 'closed';
+
+export interface Inquiry {
+  id: string;
+  customerName: string;
+  customerId?: string;
+  category: Category;
+  description: string;
+  receivedOn: string;
+  channel: InquiryChannel;
+  status: InquiryStatus;
+  quoteId?: string;
+}
+
+export type QuoteStatus = 'sent' | 'accepted' | 'declined' | 'expired';
+
+/** One priced row on a quote. unitCost is what we pay; unitPrice what the
+    customer pays — the gap is the margin the ladder helps set. */
+export interface QuoteLine {
+  description: string;
+  qty: number;
+  unitCostGhs?: number;
+  unitPriceGhs: number;
+}
+
+export interface Quote {
+  id: string;
+  customerId: string;
+  valueGhs: number;
+  sentOn: string;
+  status: QuoteStatus;
+  responseDays?: number;
+  orderIds: string[];
+  /** Present on quotes created in the builder; seeded records may omit it. */
+  lines?: QuoteLine[];
+  validUntil?: string;
+  notes?: string;
+}
+
+/** Totals for a quote's line items; empty when no lines were captured. */
+export function quoteLineTotals(q: Quote): { costGhs: number; priceGhs: number; marginGhs: number } | null {
+  if (!q.lines || q.lines.length === 0) return null;
+  let cost = 0;
+  let price = 0;
+  for (const l of q.lines) {
+    cost += (l.unitCostGhs ?? 0) * l.qty;
+    price += l.unitPriceGhs * l.qty;
+  }
+  return { costGhs: cost, priceGhs: price, marginGhs: price - cost };
+}
+
+export type CashKind = 'deposit_in' | 'balance_in' | 'supplier_out' | 'expense_out';
+
+export interface CashEntry {
+  id: string;
+  date: string;
+  kind: CashKind;
+  ghs: number;
+  label: string;
+  orderId?: string;
+}
+
+export interface OpsMeta {
+  /** Reporting month as ISO prefix, e.g. "2026-10". */
+  month: string;
+  revenueTargetGhs: number;
+  openingCashGhs: number;
+}

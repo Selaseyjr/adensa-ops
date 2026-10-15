@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 410 150" width="410" height="150">
+  <title>ADENSA — Horizontal lockup (Day)</title>
+  <g transform="translate(-25.125,-5) scale(0.3125)">
+    <rect fill="#C9A227" x="198" y="110" width="116" height="68" rx="8"/><rect fill="#0B1B2B" x="152" y="222" width="208" height="68" rx="8"/><rect fill="#0B1B2B" x="106" y="334" width="300" height="68" rx="8"/>
+  </g>
+  <text x="128" y="78" font-family="Poppins, Montserrat, 'Segoe UI', Arial, sans-serif" font-weight="700" font-size="54" letter-spacing="4.5" fill="#0B1B2B">ADENSA</text>
+  <text x="129" y="110" font-family="Poppins, Montserrat, 'Segoe UI', Arial, sans-serif" font-weight="600" font-size="14" letter-spacing="5.6" fill="#C9A227">SUPPLY &amp; LOGISTICS</text>
+</svg>

@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" href="data:," />
-    <title>Adensa Ops — Procurement Console</title>
+    <title>AdensaOps | Procurement Console</title>
     <script>
       // Apply the saved theme before first paint so dark mode never flashes.
       (function () {
@@ -17,8 +17,147 @@
         }
       })();
     </script>
+    <style>
+      /* ---- Loading splash: pure HTML/CSS so it paints before the JS bundle,
+              even on a slow connection. React fades it out on mount; if the
+              bundle never arrives it simply keeps pulsing. ---- */
+      #adensa-splash {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 28px;
+        overflow: hidden;
+        background: #070d1c;
+        transition: opacity 600ms ease;
+      }
+      #adensa-splash.splash-hide {
+        opacity: 0;
+        pointer-events: none;
+      }
+      /* Faint drifting glow field — the "eyes active" background, zero bytes
+         of video so it never competes with the bundle on a laggy network. */
+      #adensa-splash::before,
+      #adensa-splash::after {
+        content: '';
+        position: absolute;
+        width: 130vmax;
+        height: 130vmax;
+        border-radius: 50%;
+        filter: blur(10px);
+        opacity: 0.5;
+      }
+      #adensa-splash::before {
+        background: radial-gradient(circle at 30% 35%, rgba(37, 99, 235, 0.28) 0%, transparent 45%);
+        animation: splash-drift-a 16s ease-in-out infinite alternate;
+      }
+      #adensa-splash::after {
+        background: radial-gradient(circle at 70% 65%, rgba(201, 162, 39, 0.16) 0%, transparent 42%);
+        animation: splash-drift-b 20s ease-in-out infinite alternate;
+      }
+      /* Giant slow-panning wordmark watermark. */
+      #adensa-splash .splash-watermark {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: Poppins, 'Segoe UI', Arial, sans-serif;
+        font-weight: 700;
+        font-size: 24vmin;
+        letter-spacing: 0.35em;
+        text-indent: 0.35em;
+        color: rgba(245, 239, 230, 0.04);
+        user-select: none;
+        pointer-events: none;
+        animation: splash-pan 26s ease-in-out infinite alternate;
+      }
+      #adensa-splash .splash-core {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 24px;
+      }
+      #adensa-splash svg {
+        width: min(300px, 64vw);
+        height: auto;
+        filter: drop-shadow(0 8px 32px rgba(0, 0, 0, 0.45));
+      }
+      #adensa-splash .splash-tagline {
+        font-family: Poppins, 'Segoe UI', Arial, sans-serif;
+        font-weight: 700;
+        font-size: clamp(20px, 4.6vw, 30px);
+        letter-spacing: 0.04em;
+        text-align: center;
+        color: #f5efe6;
+        text-shadow: 0 2px 18px rgba(201, 162, 39, 0.35);
+      }
+      #adensa-splash .splash-tagline .gold {
+        color: #c9a227;
+      }
+      /* Indeterminate loading bar. */
+      #adensa-splash .splash-track {
+        width: min(240px, 56vw);
+        height: 4px;
+        border-radius: 999px;
+        background: rgba(245, 239, 230, 0.14);
+        overflow: hidden;
+      }
+      #adensa-splash .splash-fill {
+        width: 40%;
+        height: 100%;
+        border-radius: 999px;
+        background: linear-gradient(90deg, #2563eb, #c9a227);
+        animation: splash-load 1.4s ease-in-out infinite;
+      }
+      @keyframes splash-load {
+        0% { transform: translateX(-110%); }
+        100% { transform: translateX(310%); }
+      }
+      @keyframes splash-drift-a {
+        from { transform: translate(-18%, -12%) scale(1); }
+        to { transform: translate(14%, 10%) scale(1.15); }
+      }
+      @keyframes splash-drift-b {
+        from { transform: translate(16%, 14%) scale(1.1); }
+        to { transform: translate(-12%, -8%) scale(0.95); }
+      }
+      @keyframes splash-pan {
+        from { transform: translateX(-4%) scale(1); }
+        to { transform: translateX(4%) scale(1.06); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #adensa-splash::before,
+        #adensa-splash::after,
+        #adensa-splash .splash-watermark,
+        #adensa-splash .splash-fill {
+          animation-duration: 4s;
+        }
+      }
+    </style>
   </head>
   <body>
+    <!-- Loading screen: visible the instant the link opens, on any platform. -->
+    <div id="adensa-splash" role="status" aria-label="Loading AdensaOps">
+      <div class="splash-watermark" aria-hidden="true">ADENSA</div>
+      <div class="splash-core">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 410 150" role="img" aria-label="Adensa Supply and Logistics">
+          <g transform="translate(-25.125,-5) scale(0.3125)">
+            <rect fill="#C9A227" x="198" y="110" width="116" height="68" rx="8" />
+            <rect fill="#F5EFE6" x="152" y="222" width="208" height="68" rx="8" />
+            <rect fill="#F5EFE6" x="106" y="334" width="300" height="68" rx="8" />
+          </g>
+          <text x="128" y="78" font-family="Poppins, 'Segoe UI', Arial, sans-serif" font-weight="700" font-size="54" letter-spacing="4.5" fill="#F5EFE6">ADENSA</text>
+          <text x="129" y="110" font-family="Poppins, 'Segoe UI', Arial, sans-serif" font-weight="600" font-size="14" letter-spacing="5.6" fill="#C9A227">SUPPLY &amp; LOGISTICS</text>
+        </svg>
+        <div class="splash-tagline">The Night Never Falls<span class="gold">.</span></div>
+        <div class="splash-track" aria-hidden="true"><div class="splash-fill"></div></div>
+      </div>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

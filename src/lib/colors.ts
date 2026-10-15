@@ -5,16 +5,21 @@
 //
 // Amber and rose are reserved STRICTLY for alerts (stale price, overdue
 // follow-up, no stock) — they mean "look here", never decoration.
+// Gold is the brand accent: focus rings, highlights, the tagline dot.
+//
+// Every semantic colour is a CSS variable (defined in index.css for both
+// light and dark) so a chip on a dark surface uses the dark-mode value
+// automatically — dark navy text no longer disappears into the night.
 
 import type { CSSProperties } from 'react';
 import type { Category, ProspectStatus } from '../types';
 
 export const CATEGORY_COLORS: Record<Category, string> = {
-  cement: '#1e3a8a', // blue-900 — deep navy
-  plumbing: '#2563eb', // blue-600 — royal
-  electrical: '#0ea5e9', // sky-500 — bright sky
-  safety: '#93c5fd', // blue-300 — light sky
-  tools: '#0369a1', // sky-700 — teal-blue
+  cement: 'var(--color-cat-cement)',
+  plumbing: 'var(--color-cat-plumbing)',
+  electrical: 'var(--color-cat-electrical)',
+  safety: 'var(--color-cat-safety)',
+  tools: 'var(--color-cat-tools)',
 };
 
 /** Short labels for chart axes where the full label is too long. */
@@ -28,19 +33,19 @@ export const CATEGORY_SHORT: Record<Category, string> = {
 
 /** Pipeline stages read as deepening trust: light → mid → deep blue. */
 export const STATUS_COLORS: Record<ProspectStatus, string> = {
-  identified: '#93c5fd', // blue-300
-  contacted: '#3b82f6', // blue-500
-  vetted: '#1e3a8a', // blue-900
+  identified: 'var(--color-status-identified)',
+  contacted: 'var(--color-status-contacted)',
+  vetted: 'var(--color-status-vetted)',
 };
 
 /** Blue steps wide enough apart for a six-slice donut. */
 export const CUSTOMER_TYPE_COLORS: Record<string, string> = {
-  contractor: '#1e3a8a', // blue-900
-  plumber: '#2563eb', // blue-600
-  electrician: '#0ea5e9', // sky-500
-  business: '#1d4ed8', // blue-700
-  individual: '#93c5fd', // blue-300
-  institution: '#0369a1', // sky-700
+  contractor: 'var(--color-ctype-contractor)',
+  plumber: 'var(--color-ctype-plumber)',
+  electrician: 'var(--color-ctype-electrician)',
+  business: 'var(--color-ctype-business)',
+  individual: 'var(--color-ctype-individual)',
+  institution: 'var(--color-ctype-institution)',
 };
 
 // ---- Chart surface tokens ----
@@ -60,7 +65,8 @@ export const CHART_TOOLTIP_STYLE: CSSProperties = {
 };
 
 /** Semantic accents kept out of the blue family on purpose. */
-export const ALERT_AMBER = '#d97706'; // stale / caution
-export const ALERT_ROSE = '#e11d48'; // overdue / no stock
-export const SUCCESS_BLUE = '#1d4ed8'; // "best delivered" — stays in family
-export const SUCCESS_BLUE_SOFT = '#93c5fd';
+export const ALERT_AMBER = 'var(--color-alert-amber)'; // stale / caution
+export const ALERT_ROSE = 'var(--color-alert-rose)'; // overdue / no stock
+export const SUCCESS_BLUE = 'var(--color-success)'; // "best delivered" — stays in family
+export const SUCCESS_BLUE_SOFT = 'var(--color-brand-300)';
+export const GOLD = 'var(--color-gold-400)'; // brand accent

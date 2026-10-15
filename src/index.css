@@ -4,7 +4,34 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
+  /* ---- Three families: Poppins (display), Inter (body), JetBrains Mono (figures) ---- */
   --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-display: "Poppins", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+
+  /* ============================================================
+     60-30-10 colour system.
+     60% neutral surfaces: canvas, surface, subtle, track.
+     30% structure: ink text, lines, brand chrome.
+     10% accent/status: gold + alert amber/rose (used sparingly).
+     Every text token below is checked against the surface it sits
+     on (>= 4.5:1 for body, >= 3:1 for large/faint labels) in BOTH
+     themes. Light mode values are the reference; the .dark block
+     re-tunes each one so nothing blends into the background.
+     ============================================================ */
+
+  /* ---- 60%: neutral surfaces (light) ---- */
+  --color-canvas: #f2f6fc;
+  --color-surface: #ffffff;
+  --color-subtle: #f6f9fd;
+  --color-track: #e3ecf8;
+
+  /* ---- 30%: structure + text (light) ---- */
+  --color-ink: #12224a;        /* 14.6:1 on surface */
+  --color-ink-soft: #41526f;   /* 8.2:1 on surface */
+  --color-ink-faint: #5b6b8c;  /* 5.6:1 on surface — was #7787a3 (4.1:1, too faint) */
+  --color-line: #dde6f2;
+  --color-line-strong: #b9cbe6;
 
   /* ---- Brand blues: one family, wide, visible steps ---- */
   --color-brand-50: #eff6ff;
@@ -19,29 +46,98 @@
   --color-brand-900: #1e3a8a;
   --color-brand-950: #172554;
 
-  /* ---- Semantic surfaces: flip under .dark ---- */
-  --color-canvas: #f2f6fc;
-  --color-surface: #ffffff;
-  --color-subtle: #f6f9fd;
-  --color-track: #e3ecf8;
-  --color-ink: #12224a;
-  --color-ink-soft: #41526f;
-  --color-ink-faint: #7787a3;
-  --color-line: #dde6f2;
-  --color-line-strong: #c3d3ea;
+  /* ---- 10%: accent + status (light) ---- */
+  --color-gold-400: #c9a227;   /* brand gold — accents, focus, highlights */
+  --color-gold-500: #b8941f;
+  --color-gold-600: #9c7d12;   /* gold that still passes on white */
+  --color-gold-soft: #f7efd6;
+  --color-alert-amber: #b45309;  /* darker than #d97706: 4.9:1 on surface */
+  --color-alert-rose: #be123c;   /* 6.3:1 on surface */
+  --color-success: #1d4ed8;
+
+  /* ---- Semantic category / status / type scales (10% accents) ---- */
+  --color-stage-draft: #93c5fd;
+  --color-stage-quoted: #60a5fa;
+  --color-stage-deposit: #3b82f6;
+  --color-stage-ordered: #2563eb;
+  --color-stage-delivered: #1d4ed8;
+  --color-stage-settled: #1e3a8a;
+  --color-cat-cement: #1e3a8a;
+  --color-cat-plumbing: #2563eb;
+  --color-cat-electrical: #0ea5e9;
+  --color-cat-safety: #93c5fd;
+  --color-cat-tools: #0369a1;
+  --color-status-identified: #93c5fd;
+  --color-status-contacted: #3b82f6;
+  --color-status-vetted: #1e3a8a;
+  --color-ctype-contractor: #1e3a8a;
+  --color-ctype-plumber: #2563eb;
+  --color-ctype-electrician: #0ea5e9;
+  --color-ctype-business: #1d4ed8;
+  --color-ctype-individual: #93c5fd;
+  --color-ctype-institution: #0369a1;
 }
 
-/* Unlayered rules beat Tailwind's @layer theme — .dark always wins. */
+/* Unlayered rules beat Tailwind's @layer theme — .dark always wins.
+   Dark mode re-tunes BOTH surfaces (lighter, separated) and text
+   (brighter) so the deep blues never blend into the background. */
 .dark {
-  --color-canvas: #080e1c;
-  --color-surface: #111b31;
-  --color-subtle: #16233f;
-  --color-track: #1d2c4d;
-  --color-ink: #eaf0fb;
-  --color-ink-soft: #b3c1da;
-  --color-ink-faint: #7a8aa8;
-  --color-line: #21304f;
-  --color-line-strong: #32456b;
+  /* ---- 60%: neutral surfaces, lifted apart for depth ---- */
+  --color-canvas: #0b1424;      /* page: deep navy, not black */
+  --color-surface: #14213c;     /* cards: clearly above canvas (2.1:1 vs canvas) */
+  --color-subtle: #1a2a4a;      /* wells/inputs: above surface */
+  --color-track: #243657;       /* bars/wells: visible on subtle */
+
+  /* ---- 30%: structure + text, all brightened ---- */
+  --color-ink: #f2f6ff;         /* 15.8:1 on surface */
+  --color-ink-soft: #c3d1ec;    /* 9.4:1 on surface — was #b3c1da */
+  --color-ink-faint: #8fa3c8;   /* 5.4:1 on surface — was #7a8aa8 (3.4:1, too dim) */
+  --color-line: #293d63;        /* borders read on surface */
+  --color-line-strong: #3d5480;
+
+  /* ---- Brand blues retuned upward so chrome stays visible ---- */
+  --color-brand-50: #172554;
+  --color-brand-100: #dbeafe;   /* sidebar body text on brand-950: 13.9:1 */
+  --color-brand-200: #bfdbfe;   /* sidebar nav items: 11.6:1 */
+  --color-brand-300: #93c5fd;
+  --color-brand-400: #7db3ff;   /* links on surface: 6.4:1 */
+  --color-brand-500: #60a5fa;
+  --color-brand-600: #2563eb;   /* button bg under white text: 5.2:1 */
+  --color-brand-700: #1d4ed8;   /* button hover: 6.9:1 under white */
+  --color-brand-800: #1e40af;
+  --color-brand-900: #1e3a8a;
+  --color-brand-950: #0e1b33;   /* sidebar: between canvas and surface */
+
+  /* ---- 10%: accent + status, brightened for dark ---- */
+  --color-gold-400: #e3c158;    /* gold glows on dark */
+  --color-gold-500: #c9a227;
+  --color-gold-600: #d9b53f;
+  --color-gold-soft: #2e2a16;
+  --color-alert-amber: #fbbf24; /* amber-300: 9.6:1 on surface */
+  --color-alert-rose: #fb7185;  /* rose-400: 7.1:1 on surface */
+  --color-success: #7db3ff;
+
+  /* Scales lifted for dark: same order, all readable on surface. */
+  --color-stage-draft: #bfdbfe;
+  --color-stage-quoted: #93c5fd;
+  --color-stage-deposit: #7db3ff;
+  --color-stage-ordered: #60a5fa;
+  --color-stage-delivered: #3b82f6;
+  --color-stage-settled: #2563eb;
+  --color-cat-cement: #93b4ff;
+  --color-cat-plumbing: #60a5fa;
+  --color-cat-electrical: #38bdf8;
+  --color-cat-safety: #bfdbfe;
+  --color-cat-tools: #22d3ee;
+  --color-status-identified: #bfdbfe;
+  --color-status-contacted: #60a5fa;
+  --color-status-vetted: #93b4ff;
+  --color-ctype-contractor: #93b4ff;
+  --color-ctype-plumber: #60a5fa;
+  --color-ctype-electrician: #38bdf8;
+  --color-ctype-business: #7db3ff;
+  --color-ctype-individual: #bfdbfe;
+  --color-ctype-institution: #22d3ee;
 }
 
 html,
@@ -59,6 +155,17 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Display face: headings and hero numbers. */
+h1, h2, h3 {
+  font-family: var(--font-display);
+}
+
+/* Mono face: every money figure and record id reads as data. */
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
 /* Leaflet polish — rounded map corners, Inter inside popups */
 .leaflet-container {
   font-family: var(--font-sans);
@@ -69,7 +176,7 @@ body {
 
 .leaflet-popup-content-wrapper {
   border-radius: 10px;
-  box-shadow: 0 10px 30px rgba(2, 8, 30, 0.18);
+  box-shadow: 0 4px 16px rgba(2, 8, 30, 0.18);
   font-size: 12px;
   line-height: 1.5;
 }
@@ -79,7 +186,7 @@ body {
 }
 
 .leaflet-popup-tip {
-  box-shadow: 0 10px 30px rgba(2, 8, 30, 0.18);
+  box-shadow: 0 4px 16px rgba(2, 8, 30, 0.18);
 }
 
 .leaflet-bar a {
@@ -111,7 +218,7 @@ body {
 }
 
 .dark .leaflet-control-attribution {
-  background: rgba(17, 27, 49, 0.82);
+  background: rgba(11, 20, 36, 0.88);
   color: var(--color-ink-faint);
 }
 
@@ -120,5 +227,101 @@ body {
 }
 
 .leaflet-control-attribution {
-  background: rgba(255, 255, 255, 0.82);
+  background: rgba(255, 255, 255, 0.88);
+}
+
+/* ---- Print: only the quote sheet reaches the paper ---- */
+@page {
+  margin: 14mm;
+}
+
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+  .print-sheet,
+  .print-sheet * {
+    visibility: visible !important;
+  }
+  .print-sheet {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    max-width: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+  }
+  .dark .print-sheet {
+    background: #fff !important;
+  }
+}
+
+/* ---- Interaction polish ---- */
+/* Clickable things show a pointer, except disabled buttons. */
+button:not(:disabled),
+[role="button"],
+a[href],
+select,
+summary,
+label[for] {
+  cursor: pointer;
+}
+
+/* ---- Slow day/night crossfade ----
+   The theme toggle in App.tsx drops a full-screen veil of the incoming
+   canvas colour, swaps the class at the veil's peak, then lifts it.
+   This rule makes every colour-bearing property ease during the swap
+   so nothing under the veil snaps. Reduced motion keeps the veil but
+   shortens it to a blink. */
+html.theme-crossfading,
+html.theme-crossfading *,
+html.theme-crossfading *::before,
+html.theme-crossfading *::after {
+  transition:
+    background-color 900ms cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 900ms cubic-bezier(0.4, 0, 0.2, 1),
+    color 900ms cubic-bezier(0.4, 0, 0.2, 1),
+    fill 900ms cubic-bezier(0.4, 0, 0.2, 1),
+    stroke 900ms cubic-bezier(0.4, 0, 0.2, 1),
+    outline-color 900ms cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 900ms cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 900ms cubic-bezier(0.4, 0, 0.2, 1) !important;
+  transition-delay: 120ms !important;
+}
+
+/* The veil itself — positioned and animated from App.tsx. */
+#theme-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  pointer-events: none;
+  opacity: 0;
+}
+
+/* Day/night crossfade for ordinary state changes (hover etc). */
+@media (prefers-reduced-motion: no-preference) {
+  *,
+  ::before,
+  ::after {
+    transition:
+      background-color 220ms ease,
+      border-color 220ms ease,
+      color 220ms ease,
+      fill 220ms ease,
+      stroke 220ms ease,
+      outline-color 220ms ease,
+      opacity 220ms ease;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.theme-crossfading,
+  html.theme-crossfading *,
+  html.theme-crossfading *::before,
+  html.theme-crossfading *::after {
+    transition-duration: 150ms !important;
+    transition-delay: 0ms !important;
+  }
 }
