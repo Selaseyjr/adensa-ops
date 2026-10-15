@@ -81,8 +81,6 @@ const NAV: { key: NavKey; label: string; icon: LucideIcon }[] = [
   { key: 'cash', label: 'Cash tracker', icon: Wallet },
 ]
 
-
-
 /** Stored "real" only counts if this tab has passed the PIN gate. */
 function initialMode(): DataMode {
   const stored = getMode()

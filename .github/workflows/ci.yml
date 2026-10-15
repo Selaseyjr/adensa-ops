@@ -1,0 +1,50 @@
+# AdensaOps CI — the gate that was always promised but never existed.
+#
+# Runs the exact commands the local workflow uses (npm run build = tsc
+# --noEmit + vite build), so a push can never reach Vercel with a broken
+# typecheck or a build that doesn't produce dist/. npm ci honors the
+# lockfile exactly — no drift between what was tested and what ships.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Typecheck & build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # Fail on any lockfile drift instead of silently rewriting it.
+      - name: Install dependencies
+        run: npm ci
+
+      # npm run build = tsc --noEmit && vite build — one gate, both checks.
+      - name: Typecheck and build
+        run: npm run build
+
+      # The artifact proves the build produced a servable dist/ and lets
+      # you download exactly what CI verified.
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ github.sha }}
+          path: dist/
+          retention-days: 7
