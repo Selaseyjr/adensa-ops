@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, lazy, startTransition, useEffect, useMemo, useRef, useState } from 'react'
+import { BrowserRouter, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import {
   FileText,
   LayoutDashboard,
@@ -7,6 +8,7 @@ import {
   EyeOff,
   Menu,
   Moon,
+  Search,
   Scale,
   Sun,
   Tag,
@@ -36,10 +38,35 @@ import { daysSince, type Customer, type Order, type Quote, type QuoteStatus } fr
 import lockupDay from './assets/adensa-lockup-day.svg'
 import lockupNight from './assets/adensa-lockup-night.svg'
 import { NotificationsBell } from './components/NotificationsBell'
-import { ComparePage, CustomersPage, DashboardPage, PlannedPage, SuppliersPage } from './pages'
-import { QuoteBuilderPage } from './quoteBuilder'
+// Route-level chunks: each page (and its heavy chart/map vendor code) loads
+// only when navigated to, so the first paint ships the shell alone.
+const DashboardPage = lazy(() => import('./pages/DashboardPage').then((m) => ({ default: m.DashboardPage })))
+const SuppliersPage = lazy(() => import('./pages/SuppliersPage').then((m) => ({ default: m.SuppliersPage })))
+const CustomersPage = lazy(() => import('./pages/CustomersPage').then((m) => ({ default: m.CustomersPage })))
+const ComparePage = lazy(() => import('./pages/ComparePage').then((m) => ({ default: m.ComparePage })))
+const PlannedPage = lazy(() => import('./pages/PlannedPage').then((m) => ({ default: m.PlannedPage })))
+const QuoteBuilderPage = lazy(() => import('./quoteBuilder').then((m) => ({ default: m.QuoteBuilderPage })))
+import { ErrorBoundary, PageSkeleton } from './components/states'
+import { ToastProvider, useToast } from './components/toast'
+import { CommandPalette } from './components/CommandPalette'
+import { useFocusTrap } from './lib/a11y'
 
 type NavKey = 'dashboard' | 'suppliers' | 'customers' | 'compare' | 'quotes' | 'orders' | 'cash'
+
+/** Canonical URL per tab - every page is deep-linkable and shareable. */
+const PATH_BY_KEY: Record<NavKey, string> = {
+  dashboard: '/',
+  suppliers: '/suppliers',
+  customers: '/customers',
+  compare: '/compare',
+  quotes: '/quotes',
+  orders: '/orders',
+  cash: '/cash',
+}
+
+const KEY_BY_PATH: Record<string, NavKey> = Object.fromEntries(
+  Object.entries(PATH_BY_KEY).map(([key, path]) => [path, key as NavKey]),
+)
 
 const NAV: { key: NavKey; label: string; icon: LucideIcon }[] = [
   { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -70,12 +97,24 @@ function initialMode(): DataMode {
   return stored === 'real' && !isRealUnlocked() ? 'demo' : stored
 }
 
-export default function App() {
+function AppInner() {
   const [mode, setModeState] = useState<DataMode>(initialMode)
   const [theme, setThemeState] = useState<Theme>(getTheme)
-  const [page, setPage] = useState<NavKey>('dashboard')
+  const location = useLocation()
+  const navigate = useNavigate()
+  // The URL is the source of truth: refresh, back/forward and shared links
+  // all land on the right page.
+  const page: NavKey = KEY_BY_PATH[location.pathname] ?? 'dashboard'
+  // Transitioned navigation: while a lazy chunk loads, the whole current
+  // page (title + content) stays consistent instead of the header
+  // switching ahead of the suspended route.
+  const setPage = (next: NavKey) => startTransition(() => navigate(PATH_BY_KEY[next]))
   const [navOpen, setNavOpen] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
+  const toast = useToast()
+  const [paletteOpen, setPaletteOpen] = useState(false)
+  const paletteTriggerRef = useRef<HTMLButtonElement>(null)
+  const pinDialogRef = useRef<HTMLDivElement>(null)
 
   // Notifications: simulated feed in Demo mode ONLY. The real page always
   // gets an empty list until live events exist - never simulated data there.
@@ -105,6 +144,7 @@ export default function App() {
 
   /** New quote: assign the next id, optionally register its new customer. */
   function createQuote(q: Quote, newCustomer: Customer | null) {
+    const before = localRecords
     const id = nextQuoteId(data.quotes)
     const quote: Quote = { ...q, id }
     commitRecords({
@@ -112,12 +152,21 @@ export default function App() {
       customers: newCustomer ? [...localRecords.customers, newCustomer] : localRecords.customers,
       quotes: [...localRecords.quotes, quote],
     })
+    toast.success(`Quote ${id} created.`, { label: 'Undo', onClick: () => commitRecords(before) })
   }
 
   /** Accept/decline from the list; accepting also opens the follow-on order. */
   function setQuoteStatus(quoteId: string, status: QuoteStatus) {
     const q = data.quotes.find((x) => x.id === quoteId)
     if (!q) return
+    const before = localRecords
+    const confirmStatus = () =>
+      toast.success(
+        status === 'accepted'
+          ? `Quote ${quoteId} accepted. Order opened.`
+          : `Quote ${quoteId} declined.`,
+        { label: 'Undo', onClick: () => commitRecords(before) },
+      )
     const prev = localRecords.quoteOverrides[quoteId] ?? {}
     if (status === 'accepted' && q.orderIds.length === 0 && (prev.orderIds?.length ?? 0) === 0) {
       const orderId = nextOrderId(data.orders)
@@ -144,6 +193,7 @@ export default function App() {
           [quoteId]: { ...prev, status, responseDays: daysSince(q.sentOn), orderIds: [orderId] },
         },
       })
+      confirmStatus()
       return
     }
     commitRecords({
@@ -153,6 +203,7 @@ export default function App() {
         [quoteId]: { ...prev, status, responseDays: daysSince(q.sentOn) },
       },
     })
+    confirmStatus()
   }
 
   // A fresh mode switch loads that mode's own records.
@@ -189,6 +240,7 @@ export default function App() {
       persistMode('real')
       setModeState('real')
       closePin()
+      toast.info('Real records unlocked for this session.')
     } else {
       setPinError('Incorrect PIN. Try again.')
       pinInputRef.current?.select()
@@ -219,10 +271,38 @@ export default function App() {
     }, 480)
   }
 
-  // Close the mobile drawer whenever the page changes.
+  // Close the mobile drawer and jump to the top on navigation.
   useEffect(() => {
     setNavOpen(false)
-  }, [page])
+    window.scrollTo(0, 0)
+  }, [location.pathname])
+
+  // Command palette shortcuts: Cmd/Ctrl+K anywhere, "/" outside inputs.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        setPaletteOpen((v) => !v)
+        return
+      }
+      if (e.key === '/' && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        const el = document.activeElement
+        const typing =
+          el instanceof HTMLInputElement ||
+          el instanceof HTMLTextAreaElement ||
+          (el instanceof HTMLElement && el.isContentEditable)
+        if (!typing) {
+          e.preventDefault()
+          setPaletteOpen(true)
+        }
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
+  // Unknown paths fall back to the dashboard instead of a blank screen.
+  const pathKnown = location.pathname in KEY_BY_PATH
 
   // Dismiss the loading splash once React has painted. If the bundle was
   // slow the splash carried the user; now fade it out beneath them.
@@ -234,14 +314,22 @@ export default function App() {
     return () => window.clearTimeout(t)
   }, [])
 
-  // Focus the PIN field when the modal opens.
-  useEffect(() => {
-    if (pinOpen) pinInputRef.current?.focus()
-  }, [pinOpen])
+  // Focus trap: keeps Tab inside the PIN dialog, Escape closes it,
+  // focus returns to the control that opened it.
+  useFocusTrap(pinDialogRef, pinOpen, closePin)
+
+  if (!pathKnown) return <Navigate to="/" replace />
 
   return (
     <ThemeContext.Provider value={theme}>
       <div className="flex min-h-full">
+        {/* Skip link: first tab stop, jumps over nav for keyboard users */}
+        <a
+          href="#main"
+          className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[80] focus:rounded-lg focus:bg-brand-600 focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-white"
+        >
+          Skip to main content
+        </a>
         {/* Mobile backdrop */}
         {navOpen && (
           <button
@@ -294,13 +382,23 @@ export default function App() {
                 Your project, Our Procurement.
               </span>
             </div>
-            <button
-              onClick={() => setNavOpen(false)}
-              aria-label="Close navigation"
-              className="cursor-pointer rounded-md p-1 text-ink-faint transition hover:bg-subtle hover:text-ink dark:text-brand-300 dark:hover:bg-brand-900 dark:hover:text-white md:hidden"
-            >
-              <X size={18} />
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={toggleTheme}
+                aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+                title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
+                className="flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-md text-ink-faint transition hover:bg-subtle hover:text-ink dark:text-brand-300 dark:hover:bg-brand-900 dark:hover:text-white sm:hidden"
+              >
+                {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+              </button>
+              <button
+                onClick={() => setNavOpen(false)}
+                aria-label="Close navigation"
+                className="flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-md text-ink-faint transition hover:bg-subtle hover:text-ink dark:text-brand-300 dark:hover:bg-brand-900 dark:hover:text-white md:hidden"
+              >
+                <X size={18} />
+              </button>
+            </div>
           </div>
           <nav className="flex-1 space-y-0.5 px-3 py-4">
             {NAV.map((item) => {
@@ -310,7 +408,8 @@ export default function App() {
                 <button
                   key={item.key}
                   onClick={() => setPage(item.key)}
-                  className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm transition ${
+                  aria-current={active ? 'page' : undefined}
+                  className={`flex min-h-11 w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm transition ${
                     active
                       ? 'bg-brand-600 font-medium text-white shadow-sm shadow-brand-950'
                       : 'text-ink-soft hover:bg-subtle hover:text-ink dark:text-brand-200 dark:hover:bg-brand-900 dark:hover:text-white'
@@ -330,12 +429,12 @@ export default function App() {
         {/* Main */}
         <div className="flex min-w-0 flex-1 flex-col">
           {/* Top bar: menu + title + date + controls */}
-          <header className="flex items-center justify-between gap-3 border-b border-line bg-surface px-4 py-3 sm:px-6">
-            <div className="flex min-w-0 items-center gap-3">
+          <header className="flex items-center justify-between gap-1.5 border-b border-line bg-surface px-3 py-3 sm:gap-3 sm:px-6">
+            <div className="flex min-w-0 flex-1 items-center gap-1.5 sm:gap-3">
               <button
                 onClick={() => setNavOpen(true)}
                 aria-label="Open navigation"
-                className="rounded-lg border border-line-strong p-2 text-ink-soft transition hover:bg-subtle md:hidden"
+                className="flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-lg border border-line-strong text-ink-soft transition hover:bg-subtle md:hidden"
               >
                 <Menu size={18} />
               </button>
@@ -351,7 +450,7 @@ export default function App() {
                 }}
                 title="Back to dashboard"
                 aria-label="AdensaOps, back to dashboard"
-                className="relative aspect-[410/150] h-7 shrink-0 cursor-pointer rounded transition-opacity duration-200 hover:opacity-75 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 md:hidden"
+                className="relative hidden aspect-[410/150] h-7 shrink-0 cursor-pointer rounded transition-opacity duration-200 hover:opacity-75 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 sm:block md:hidden"
               >
                 <img
                   src={lockupNight}
@@ -369,8 +468,8 @@ export default function App() {
                   }`}
                 />
               </div>
-              <div className="min-w-0">
-                <h1 className="truncate text-base font-semibold text-ink">
+              <div className="min-w-0 flex-1">
+                <h1 className="truncate text-[13px] font-semibold text-ink sm:text-base">
                   {NAV.find((n) => n.key === page)?.label}
                 </h1>
                 <p className="hidden text-[11px] text-ink-faint sm:block">
@@ -384,12 +483,23 @@ export default function App() {
               </div>
             </div>
             <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+              {/* Search trigger for the command palette */}
+              <button
+                ref={paletteTriggerRef}
+                onClick={() => setPaletteOpen(true)}
+                aria-label="Search (Command K)"
+                title="Search · Ctrl+K"
+                className="hidden min-h-11 min-w-11 items-center justify-center gap-2 rounded-lg border border-line-strong bg-surface px-2.5 text-ink-soft transition hover:bg-subtle hover:text-ink sm:flex lg:min-w-auto lg:justify-start"
+              >
+                <Search size={16} aria-hidden="true" />
+                <span className="hidden text-xs lg:inline">Search</span>
+              </button>
               {/* Theme toggle — night shift mode */}
               <button
                 onClick={toggleTheme}
                 aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
                 title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
-                className="rounded-lg border border-line-strong bg-surface p-2 text-ink-soft transition hover:bg-subtle hover:text-ink"
+                className="hidden min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-lg border border-line-strong bg-surface text-ink-soft transition hover:bg-subtle hover:text-ink sm:flex"
               >
                 {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
               </button>
@@ -397,7 +507,7 @@ export default function App() {
               <div className="flex overflow-hidden rounded-full border border-line-strong text-xs font-medium shadow-sm">
                 <button
                   onClick={() => changeMode('demo')}
-                  className={`px-4 py-1.5 transition ${
+                  className={`min-h-11 px-2 transition sm:px-4 ${
                     mode === 'demo'
                       ? 'bg-brand-600 text-white'
                       : 'bg-surface text-ink-soft hover:bg-subtle'
@@ -408,7 +518,7 @@ export default function App() {
                 <button
                   onClick={() => changeMode('real')}
                   title={realLocked ? 'Real records are PIN-protected' : 'Real operational records'}
-                  className={`flex items-center gap-1.5 px-4 py-1.5 transition ${
+                  className={`flex min-h-11 items-center gap-1.5 px-2 transition sm:px-4 ${
                     mode === 'real'
                       ? 'bg-amber-700 text-white'
                       : 'bg-surface text-ink-soft hover:bg-subtle'
@@ -435,7 +545,9 @@ export default function App() {
           </header>
 
           {/* Page */}
-          <main className="flex-1 bg-canvas px-4 py-5 sm:px-6 sm:py-6">
+          <main id="main" className="flex-1 bg-canvas px-4 py-5 sm:px-6 sm:py-6">
+            <ErrorBoundary resetKey={location.pathname}>
+            <Suspense fallback={<PageSkeleton />}>
             {page === 'dashboard' && (
               <DashboardPage
                 data={data}
@@ -467,12 +579,24 @@ export default function App() {
                 icon={PLANNED[page]!.icon}
               />
             )}
+            </Suspense>
+            </ErrorBoundary>
           </main>
         </div>
       </div>
 
       {/* Theme crossfade veil — sits above all, invisible except mid-swap */}
       <div id="theme-veil" aria-hidden="true" />
+
+      <CommandPalette
+        open={paletteOpen}
+        onClose={() => {
+          setPaletteOpen(false)
+          paletteTriggerRef.current?.focus()
+        }}
+        data={data}
+        onNavigate={setPage}
+      />
 
       {/* PIN modal — gates Real data mode on the public deployment */}
       {pinOpen && (
@@ -482,7 +606,9 @@ export default function App() {
           role="presentation"
         >
           <div
-            className="w-full max-w-sm rounded-xl border border-line bg-surface p-6 shadow-xl"
+            ref={pinDialogRef}
+            tabIndex={-1}
+            className="w-full max-w-sm rounded-xl border border-line bg-surface p-6 shadow-xl outline-none"
             onClick={(e) => e.stopPropagation()}
             role="dialog"
             aria-modal="true"
@@ -548,5 +674,15 @@ export default function App() {
         </div>
       )}
     </ThemeContext.Provider>
+  )
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <ToastProvider>
+        <AppInner />
+      </ToastProvider>
+    </BrowserRouter>
   )
 }

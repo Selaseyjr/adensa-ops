@@ -1,0 +1,6 @@
+export { DashboardPage } from './DashboardPage'
+export { SuppliersPage } from './SuppliersPage'
+export { CustomersPage } from './CustomersPage'
+export { ComparePage } from './ComparePage'
+export { PlannedPage } from './PlannedPage'
+export { KpiDetailModal } from './shared'

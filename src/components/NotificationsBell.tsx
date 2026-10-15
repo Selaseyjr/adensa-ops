@@ -107,7 +107,7 @@ export function NotificationsBell({
         aria-expanded={open}
         aria-haspopup="true"
         title="Notifications"
-        className={`relative rounded-lg border p-2 transition ${
+        className={`relative flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-lg border transition ${
           open
             ? 'border-brand-300 bg-brand-50 text-brand-700 dark:border-brand-700 dark:bg-brand-950/60 dark:text-brand-300'
             : 'border-line-strong bg-surface text-ink-soft hover:bg-subtle hover:text-ink'
