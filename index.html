@@ -18,6 +18,10 @@
           var saved = localStorage.getItem('adensa.theme');
           var dark = saved ? saved === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
           if (dark) document.documentElement.classList.add('dark');
+          // Phone and tablet browsers tint the browser chrome with theme-color:
+          // keep it on the active canvas so the chrome matches the page.
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) meta.setAttribute('content', dark ? '#0B1424' : '#F2F6FC');
         } catch (e) {
           /* storage unavailable — stay on light */
         }

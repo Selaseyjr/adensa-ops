@@ -13,6 +13,10 @@ dist/
 !.env.example
 .dev.vars
 
+# Test artifacts (Playwright output, regenerated every run)
+test-results/
+playwright-report/
+
 # Editor / OS noise
 .DS_Store
 *.local

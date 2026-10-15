@@ -146,6 +146,16 @@ body,
   height: 100%;
 }
 
+/* Native form controls, scrollbars and UA widgets follow the app theme on
+   phone and tablet (date pickers, select popups, form control chrome). */
+:root {
+  color-scheme: light;
+}
+
+.dark {
+  color-scheme: dark;
+}
+
 body {
   margin: 0;
   font-family: var(--font-sans);

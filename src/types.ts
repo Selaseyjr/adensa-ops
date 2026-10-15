@@ -96,6 +96,10 @@ export const STATUS_LABELS: Record<ProspectStatus, string> = {
   vetted: 'Vetted',
 };
 
+/** Stable identity of a price row: overrides (sim, imports) key on this. */
+export function priceKey(p: Price): string {
+  return `${p.productId}|${p.supplierId ?? ''}|${p.type}`
+}
 export const PRICE_STALE_DAYS = 14;
 
 export function daysSince(isoDate: string, asOf: Date = new Date()): number {

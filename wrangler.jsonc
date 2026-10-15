@@ -7,5 +7,14 @@
     "directory": "./dist",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application"
-  }
+  },
+  // Local dev/test only: the deployed binding is attached by Sites when the
+  // environment's provisioned D1 database is linked at deploy time.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "adensa-ops",
+      "database_id": "local-dev-placeholder"
+    }
+  ]
 }

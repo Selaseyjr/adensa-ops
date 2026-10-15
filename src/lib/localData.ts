@@ -83,6 +83,30 @@ export function saveLocal(mode: DataMode, records: LocalRecords): void {
   }
 }
 
+/**
+ * Union of two record sets for sync (local + remote from D1).
+ *
+ * Arrays are unioned by id: records created on another device arrive, and
+ * local records are never dropped. For an id present on both sides, the LOCAL
+ * copy wins (the device you are typing on is authoritative for its edits).
+ * Overrides merge key-by-key with local precedence for the same reason.
+ */
+export function mergeRecords(local: LocalRecords, remote: LocalRecords): LocalRecords {
+  const unionById = <T extends { id: string }>(a: T[], b: T[]): T[] => {
+    const seen = new Set(a.map((x) => x.id))
+    return [...a, ...b.filter((x) => !seen.has(x.id))]
+  };
+  return {
+    customers: unionById(local.customers, remote.customers),
+    orders: unionById(local.orders, remote.orders),
+    inquiries: unionById(local.inquiries, remote.inquiries),
+    quotes: unionById(local.quotes, remote.quotes),
+    cash: unionById(local.cash, remote.cash),
+    quoteOverrides: { ...remote.quoteOverrides, ...local.quoteOverrides },
+    orderOverrides: { ...remote.orderOverrides, ...local.orderOverrides },
+  };
+}
+
 /** Seed dataset + locally created records + status overrides, in that order. */
 export function mergeDataset(base: Dataset, local: LocalRecords): Dataset {
   const quotes = [...base.quotes, ...local.quotes].map((q) => {

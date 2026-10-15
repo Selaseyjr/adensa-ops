@@ -1,9 +1,19 @@
 # AdensaOps CI — the gate that was always promised but never existed.
 #
-# Runs the exact commands the local workflow uses (npm run build = tsc
-# --noEmit + vite build), so a push can never reach Vercel with a broken
-# typecheck or a build that doesn't produce dist/. npm ci honors the
-# lockfile exactly — no drift between what was tested and what ships.
+# Three gates run exactly what the local workflow uses:
+#   1. build   = tsc --noEmit && vite build (a push can never reach Vercel
+#                with a broken typecheck or a build that produces no dist/)
+#   2. unit    = Vitest (68 unit/component tests: simulation engine, merge
+#                authority, notifications, theme, local records, bell UX,
+#                D1 worker API, local-first sync)
+#   3. e2e     = Playwright on Chromium in desktop/phone/tablet projects
+#                (36 tests: theme on mobile widths, live simulation cadence,
+#                bell UX, console-clean navigation on every route)
+#
+# Total: 104 tests.
+#
+# npm ci honors the lockfile exactly — no drift between what was tested and
+# what ships.
 
 name: CI
 
@@ -48,3 +58,81 @@ jobs:
           name: dist-${{ github.sha }}
           path: dist/
           retention-days: 7
+
+  unit:
+    name: Unit & component tests (Vitest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Vitest suite
+        run: npm test
+
+      - name: Upload coverage output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vitest-report-${{ github.sha }}
+          path: |
+            test-results/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  e2e:
+    name: End-to-end tests (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Cache the browser binaries between runs (keyed on the Playwright version).
+      - name: Get Playwright version
+        id: pw
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
+
+      - name: Install Playwright browsers
+        if: steps.pw-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Install OS deps for cached browsers
+        if: steps.pw-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+
+      # webServer in playwright.config.ts starts the Vite dev server itself.
+      - name: Run Playwright suite
+        run: npm run test:e2e
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ github.sha }}
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+          if-no-files-found: ignore

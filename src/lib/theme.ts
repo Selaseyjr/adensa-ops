@@ -24,6 +24,10 @@ export function persistTheme(theme: Theme): void {
 
 export function applyTheme(theme: Theme): void {
   document.documentElement.classList.toggle('dark', theme === 'dark');
+  // Phone and tablet browsers tint the browser chrome with theme-color.
+  document
+    .querySelector('meta[name="theme-color"]:not([media])')
+    ?.setAttribute('content', theme === 'dark' ? '#0B1424' : '#F2F6FC');
 }
 
 /** Provided by <App>; consumed by components that cannot inherit CSS tokens (Leaflet). */

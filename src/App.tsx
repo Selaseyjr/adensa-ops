@@ -22,7 +22,6 @@ import { getMode, persistMode, type DataMode, type Dataset } from './lib/dataSou
 import {
   loadLocal,
   localDate,
-  mergeDataset,
   nextOrderId,
   nextQuoteId,
   nextCashId,
@@ -31,8 +30,10 @@ import {
   type OrderOverride,
 } from './lib/localData'
 import { isRealUnlocked, unlockReal, verifyPin } from './lib/realAccess'
+import { createPushQueue, hydrateRecords } from './lib/remote'
 import { applyTheme, getTheme, persistTheme, ThemeContext, type Theme } from './lib/theme'
 import { useNotifications } from './lib/notifications'
+import { EMPTY_SIM, mergeSim, useSimulation } from './lib/simulation'
 import { demo } from './data/demo'
 import { demoNotifications } from './data/demoNotifications'
 import { real } from './data/real'
@@ -106,11 +107,6 @@ function AppInner() {
   const paletteTriggerRef = useRef<HTMLButtonElement>(null)
   const pinDialogRef = useRef<HTMLDivElement>(null)
 
-  // Notifications: simulated feed in Demo mode ONLY. The real page always
-  // gets an empty list until live events exist - never simulated data there.
-  const notifItems = useMemo(() => (mode === 'demo' ? demoNotifications : []), [mode])
-  const notifState = useNotifications(notifItems)
-
   // PIN gate state
   const [pinOpen, setPinOpen] = useState(false)
   const [pinValue, setPinValue] = useState('')
@@ -122,14 +118,43 @@ function AppInner() {
   const base: Dataset = mode === 'demo' ? demo : real
 
   // Records created in the UI live in the browser (per mode) and layer over
-  // the seeded dataset. Swap loadLocal/saveLocal for an API when D1 lands.
+  // the seeded dataset. Local-first sync: render from localStorage at once,
+  // merge the D1 copy in when it arrives, and push every commit back (debounced).
   const [localRecords, setLocalRecords] = useState<LocalRecords>(() => loadLocal(initialMode()))
-  const data: Dataset = useMemo(() => mergeDataset(base, localRecords), [base, localRecords])
+  const pushQueueRef = useRef(createPushQueue(initialMode()))
+
+  // Demo simulation overlay: timed events (inquiries, orders, payments, stage
+  // moves, repricing) so the demo numbers keep moving. Gated on demo mode;
+  // real mode never merges or renders simulated records (privacy rule).
+  const { layer: simLayer, notifications: simNotifications } = useSimulation(
+    mode === 'demo',
+    (sim) => mergeSim(base, localRecords, sim),
+  )
+  const simInMode = mode === 'demo' ? simLayer : EMPTY_SIM
+  const data: Dataset = useMemo(
+    () => mergeSim(base, localRecords, simInMode),
+    [base, localRecords, simInMode],
+  )
   const realLocked = !isRealUnlocked()
+
+  // Notifications: static seed feed + live simulation events (demo only).
+  // Live items age from createdAt on every tick; real mode always gets [].
+  const notifItems = useMemo(() => {
+    if (mode !== 'demo') return []
+    if (simNotifications.length === 0) return demoNotifications
+    const now = Date.now()
+    const live = simNotifications.map((n) => ({
+      ...n,
+      minutesAgo: Math.max(0, (now - n.createdAt) / 60_000),
+    }))
+    return [...live, ...demoNotifications]
+  }, [mode, simNotifications])
+  const notifState = useNotifications(notifItems, mode)
 
   function commitRecords(next: LocalRecords) {
     setLocalRecords(next)
     saveLocal(mode, next)
+    pushQueueRef.current(next)
   }
 
   /** New quote: assign the next id, optionally register its new customer. */
@@ -207,7 +232,7 @@ function AppInner() {
     const prev = localRecords.orderOverrides[orderId] ?? {}
     let cash = localRecords.cash
     for (const entry of opts?.cash ?? []) {
-      cash = [...cash, { ...entry, id: nextCashId([...base.cash, ...cash], mode) }]
+      cash = [...cash, { ...entry, id: nextCashId([...data.cash, ...cash], mode) }]
     }
     commitRecords({
       ...localRecords,
@@ -223,14 +248,28 @@ function AppInner() {
   /** Record a supplier payment or expense from the Cash tracker. */
   function addCash(entry: Omit<CashEntry, 'id'>, message: string) {
     const before = localRecords
-    const id = nextCashId([...base.cash, ...localRecords.cash], mode)
+    const id = nextCashId(data.cash, mode)
     commitRecords({ ...localRecords, cash: [...localRecords.cash, { ...entry, id }] })
     toast.success(message, { label: 'Undo', onClick: () => commitRecords(before) })
   }
 
-  // A fresh mode switch loads that mode's own records.
+  // A fresh mode switch loads that mode's own records, then merges the
+  // server copy (D1) if a backend is reachable. Without a backend this is
+  // exactly the old behaviour: local records only.
   useEffect(() => {
-    setLocalRecords(loadLocal(mode))
+    pushQueueRef.current = createPushQueue(mode)
+    const local = loadLocal(mode)
+    setLocalRecords(local)
+    let cancelled = false
+    void hydrateRecords(mode, local, (merged) => {
+      if (!cancelled) {
+        setLocalRecords(merged)
+        saveLocal(mode, merged)
+      }
+    })
+    return () => {
+      cancelled = true
+    }
   }, [mode])
 
   function changeMode(next: DataMode) {
@@ -363,7 +402,7 @@ function AppInner() {
 
         {/* Sidebar — fixed drawer on mobile, static column from md up */}
         <aside
-          className={`fixed inset-y-0 left-0 z-40 flex w-60 shrink-0 flex-col border-r border-line bg-surface text-ink-soft transition-all duration-200 dark:border-brand-900 dark:bg-brand-950 dark:text-brand-100 md:static md:translate-x-0 ${
+          className={`fixed inset-y-0 left-0 z-40 flex w-64 shrink-0 flex-col border-r border-line bg-surface text-ink-soft transition-all duration-200 dark:border-brand-900 dark:bg-brand-950 dark:text-brand-100 md:static md:w-60 md:translate-x-0 ${
             navOpen ? 'translate-x-0' : '-translate-x-full'
           }`}
         >
@@ -383,7 +422,10 @@ function AppInner() {
               aria-label="AdensaOps, back to dashboard"
               className="min-w-0 cursor-pointer rounded-lg transition-opacity duration-200 hover:opacity-75 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#C9A227]"
             >
-              <div className="relative aspect-[410/150] w-40">
+              {/* w-full + max-w so the lockup shrinks beside the toggle buttons
+                  instead of overlapping them (on a phone the old fixed w-40 sat
+                  on top of the theme toggle and swallowed every tap on it). */}
+              <div className="relative aspect-[410/150] w-full max-w-40">
                 <img
                   src={lockupNight}
                   alt=""
@@ -404,7 +446,8 @@ function AppInner() {
                 Your project, Our Procurement.
               </span>
             </div>
-            <div className="flex items-center gap-1">
+            {/* z-10 keeps these tappable above the lockup image at any width */}
+            <div className="relative z-10 flex shrink-0 items-center gap-1">
               <button
                 onClick={toggleTheme}
                 aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}

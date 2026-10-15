@@ -10,7 +10,15 @@ export type NotificationTarget =
   | 'orders'
   | 'cash'
 
-export type NotificationKind = 'supplier' | 'price' | 'quote' | 'order' | 'delivery' | 'inquiry'
+export type NotificationKind =
+  | 'supplier'
+  | 'price'
+  | 'quote'
+  | 'order'
+  | 'delivery'
+  | 'inquiry'
+  | 'payment'
+  | 'expense'
 
 export interface AppNotification {
   id: string
@@ -55,7 +63,7 @@ export interface NotificationState {
  * simulated items are ever mixed into the real page (per the privacy rule).
  * State is session-only: read flags are ephemeral, not operational records.
  */
-export function useNotifications(items: AppNotification[]): NotificationState {
+export function useNotifications(items: AppNotification[], feedKey: string = ''): NotificationState {
   const [readIds, setReadIds] = useState<string[]>(() =>
     items.filter((i) => i.initiallyRead).map((i) => i.id),
   )
@@ -63,9 +71,11 @@ export function useNotifications(items: AppNotification[]): NotificationState {
 
   // A new feed (Demo <-> Real switch) invalidates the pending undo step, so an
   // empty real-mode panel can never show an Undo button with nothing to undo.
+  // Keyed on feed identity, NOT items identity: live demo notifications
+  // arriving must not clear an operator's pending undo.
   useEffect(() => {
     setPrev(null)
-  }, [items])
+  }, [feedKey])
 
   const markOne = useCallback(
     (id: string, read: boolean) => {

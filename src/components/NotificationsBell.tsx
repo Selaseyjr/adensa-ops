@@ -5,8 +5,10 @@ import {
   Check,
   CheckCheck,
   PackageCheck,
+  Receipt,
   RotateCcw,
   Tag,
+  Wallet,
   Truck,
   Users,
   X,
@@ -22,6 +24,8 @@ import {
 
 const KIND_ICON: Record<NotificationKind, LucideIcon> = {
   supplier: Truck,
+  payment: Wallet,
+  expense: Receipt,
   price: Tag,
   quote: CheckCheck,
   order: PackageCheck,
@@ -31,6 +35,8 @@ const KIND_ICON: Record<NotificationKind, LucideIcon> = {
 
 const KIND_LABEL: Record<NotificationKind, string> = {
   supplier: 'Supplier',
+  payment: 'Payment',
+  expense: 'Expense',
   price: 'Price update',
   quote: 'Quotation',
   order: 'Order',
