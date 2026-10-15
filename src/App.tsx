@@ -46,8 +46,8 @@ const DashboardPage = lazy(() => import('./pages/DashboardPage').then((m) => ({ 
 const SuppliersPage = lazy(() => import('./pages/SuppliersPage').then((m) => ({ default: m.SuppliersPage })))
 const CustomersPage = lazy(() => import('./pages/CustomersPage').then((m) => ({ default: m.CustomersPage })))
 const ComparePage = lazy(() => import('./pages/ComparePage').then((m) => ({ default: m.ComparePage })))
-const PlannedPage = lazy(() => import('./pages/PlannedPage').then((m) => ({ default: m.PlannedPage })))
 const OrdersPage = lazy(() => import('./pages/OrdersPage').then((m) => ({ default: m.OrdersPage })))
+const CashTrackerPage = lazy(() => import('./pages/CashTrackerPage').then((m) => ({ default: m.CashTrackerPage })))
 const QuoteBuilderPage = lazy(() => import('./quoteBuilder').then((m) => ({ default: m.QuoteBuilderPage })))
 import { ErrorBoundary, PageSkeleton } from './components/states'
 import { ToastProvider, useToast } from './components/toast'
@@ -81,13 +81,7 @@ const NAV: { key: NavKey; label: string; icon: LucideIcon }[] = [
   { key: 'cash', label: 'Cash tracker', icon: Wallet },
 ]
 
-const PLANNED: Partial<Record<NavKey, { title: string; note: string; icon: LucideIcon }>> = {
-  cash: {
-    title: 'Cash tracker',
-    note: 'Deposit-vs-balance ledger and dashboard totals. Ships Day 5.',
-    icon: Wallet,
-  },
-}
+
 
 /** Stored "real" only counts if this tab has passed the PIN gate. */
 function initialMode(): DataMode {
@@ -226,6 +220,14 @@ function AppInner() {
       label: 'Undo',
       onClick: () => commitRecords(before),
     })
+  }
+
+  /** Record a supplier payment or expense from the Cash tracker. */
+  function addCash(entry: Omit<CashEntry, 'id'>, message: string) {
+    const before = localRecords
+    const id = nextCashId([...base.cash, ...localRecords.cash], mode)
+    commitRecords({ ...localRecords, cash: [...localRecords.cash, { ...entry, id }] })
+    toast.success(message, { label: 'Undo', onClick: () => commitRecords(before) })
   }
 
   // A fresh mode switch loads that mode's own records.
@@ -585,6 +587,13 @@ function AppInner() {
             {page === 'suppliers' && <SuppliersPage data={data} />}
             {page === 'customers' && <CustomersPage data={data} />}
             {page === 'compare' && <ComparePage data={data} />}
+            {page === 'cash' && (
+              <CashTrackerPage
+                data={data}
+                onNavigate={(target) => setPage(target)}
+                onAddCash={addCash}
+              />
+            )}
             {page === 'orders' && (
               <OrdersPage
                 data={data}
@@ -599,13 +608,6 @@ function AppInner() {
                 onNavigate={(target) => setPage(target)}
                 onCreateQuote={createQuote}
                 onSetStatus={setQuoteStatus}
-              />
-            )}
-            {PLANNED[page] && (
-              <PlannedPage
-                title={PLANNED[page]!.title}
-                note={PLANNED[page]!.note}
-                icon={PLANNED[page]!.icon}
               />
             )}
             </Suspense>
