@@ -19,6 +19,16 @@ export interface QuoteOverride {
   orderIds?: string[];
 }
 
+/** Stage / field changes made in the UI, applied over any order (seeded or local). */
+export interface OrderOverride {
+  stage?: Order['stage'];
+  depositGhs?: number;
+  expectedDelivery?: string;
+  completedOn?: string;
+  receipt?: Order['receipt'];
+  notes?: string;
+}
+
 export interface LocalRecords {
   customers: Customer[];
   orders: Order[];
@@ -26,6 +36,7 @@ export interface LocalRecords {
   quotes: Quote[];
   cash: CashEntry[];
   quoteOverrides: Record<string, QuoteOverride>;
+  orderOverrides: Record<string, OrderOverride>;
 }
 
 const EMPTY: LocalRecords = {
@@ -35,6 +46,7 @@ const EMPTY: LocalRecords = {
   quotes: [],
   cash: [],
   quoteOverrides: {},
+  orderOverrides: {},
 };
 
 const key = (mode: DataMode): string => `adensa.localRecords.${mode}.v1`;
@@ -54,6 +66,8 @@ export function loadLocal(mode: DataMode): LocalRecords {
       cash: Array.isArray(parsed.cash) ? parsed.cash : [],
       quoteOverrides:
         parsed.quoteOverrides && typeof parsed.quoteOverrides === 'object' ? parsed.quoteOverrides : {},
+      orderOverrides:
+        parsed.orderOverrides && typeof parsed.orderOverrides === 'object' ? parsed.orderOverrides : {},
     };
   } catch {
     return EMPTY;
@@ -75,10 +89,14 @@ export function mergeDataset(base: Dataset, local: LocalRecords): Dataset {
     const o = local.quoteOverrides[q.id];
     return o ? { ...q, ...o } : q;
   });
+  const orders = [...base.orders, ...local.orders].map((o) => {
+    const ov = local.orderOverrides[o.id];
+    return ov ? { ...o, ...ov } : o;
+  });
   return {
     ...base,
     customers: [...base.customers, ...local.customers],
-    orders: [...base.orders, ...local.orders],
+    orders,
     inquiries: [...base.inquiries, ...local.inquiries],
     quotes,
     cash: [...base.cash, ...local.cash],
@@ -113,6 +131,17 @@ export function nextOrderId(existing: Order[]): string {
     if (m) max = Math.max(max, Number.parseInt(m[1], 10));
   }
   return `ORD-${String(max + 1).padStart(4, '0')}`;
+}
+
+/** Next cash-entry id in the mode's seeded convention: d-csh-nnn in demo, csh-nnn in real. */
+export function nextCashId(existing: CashEntry[], mode: DataMode): string {
+  const prefix = mode === 'demo' ? 'd-csh-' : 'csh-';
+  let max = 0;
+  for (const c of existing) {
+    const m = new RegExp(`^${prefix}(\\d+)$`).exec(c.id);
+    if (m) max = Math.max(max, Number.parseInt(m[1], 10));
+  }
+  return `${prefix}${String(max + 1).padStart(3, '0')}`;
 }
 
 /** Local calendar date (not UTC) so "today" matches the header date. */

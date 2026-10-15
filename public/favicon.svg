@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <title>Adensa Supply &amp; Logistics</title>
+  <!-- Stack Peak mark on Adensa Night: Dawn Gold cap over two sand bars.
+       Same geometry as 07_Brand & Marketing/Logo Suite/adensa-mark-*.svg. -->
+  <rect width="512" height="512" rx="112" fill="#0B1424"/>
+  <rect fill="#C9A227" x="198" y="110" width="116" height="68" rx="8"/>
+  <rect fill="#F5EFE6" x="152" y="222" width="208" height="68" rx="8"/>
+  <rect fill="#F5EFE6" x="106" y="334" width="300" height="68" rx="8"/>
+</svg>

@@ -25,8 +25,10 @@ import {
   mergeDataset,
   nextOrderId,
   nextQuoteId,
+  nextCashId,
   saveLocal,
   type LocalRecords,
+  type OrderOverride,
 } from './lib/localData'
 import { isRealUnlocked, unlockReal, verifyPin } from './lib/realAccess'
 import { applyTheme, getTheme, persistTheme, ThemeContext, type Theme } from './lib/theme'
@@ -34,7 +36,7 @@ import { useNotifications } from './lib/notifications'
 import { demo } from './data/demo'
 import { demoNotifications } from './data/demoNotifications'
 import { real } from './data/real'
-import { daysSince, type Customer, type Order, type Quote, type QuoteStatus } from './types'
+import { daysSince, type CashEntry, type Customer, type Order, type Quote, type QuoteStatus } from './types'
 import lockupDay from './assets/adensa-lockup-day.svg'
 import lockupNight from './assets/adensa-lockup-night.svg'
 import { NotificationsBell } from './components/NotificationsBell'
@@ -45,6 +47,7 @@ const SuppliersPage = lazy(() => import('./pages/SuppliersPage').then((m) => ({ 
 const CustomersPage = lazy(() => import('./pages/CustomersPage').then((m) => ({ default: m.CustomersPage })))
 const ComparePage = lazy(() => import('./pages/ComparePage').then((m) => ({ default: m.ComparePage })))
 const PlannedPage = lazy(() => import('./pages/PlannedPage').then((m) => ({ default: m.PlannedPage })))
+const OrdersPage = lazy(() => import('./pages/OrdersPage').then((m) => ({ default: m.OrdersPage })))
 const QuoteBuilderPage = lazy(() => import('./quoteBuilder').then((m) => ({ default: m.QuoteBuilderPage })))
 import { ErrorBoundary, PageSkeleton } from './components/states'
 import { ToastProvider, useToast } from './components/toast'
@@ -79,11 +82,6 @@ const NAV: { key: NavKey; label: string; icon: LucideIcon }[] = [
 ]
 
 const PLANNED: Partial<Record<NavKey, { title: string; note: string; icon: LucideIcon }>> = {
-  orders: {
-    title: 'Order pipeline',
-    note: 'Draft → Quoted → Deposit → Ordered → Delivered → Settled, with receipt & discrepancy capture. Ships Day 4.',
-    icon: Tag,
-  },
   cash: {
     title: 'Cash tracker',
     note: 'Deposit-vs-balance ledger and dashboard totals. Ships Day 5.',
@@ -204,6 +202,30 @@ function AppInner() {
       },
     })
     confirmStatus()
+  }
+
+  /** Stage / money transitions on any order, seeded or local. Each change
+      lands as an override (+ optional cash entries) with an Undo toast. */
+  function updateOrder(
+    orderId: string,
+    patch: OrderOverride,
+    opts?: { cash?: Omit<CashEntry, 'id'>[]; message: string },
+  ) {
+    const before = localRecords
+    const prev = localRecords.orderOverrides[orderId] ?? {}
+    let cash = localRecords.cash
+    for (const entry of opts?.cash ?? []) {
+      cash = [...cash, { ...entry, id: nextCashId([...base.cash, ...cash], mode) }]
+    }
+    commitRecords({
+      ...localRecords,
+      cash,
+      orderOverrides: { ...localRecords.orderOverrides, [orderId]: { ...prev, ...patch } },
+    })
+    toast.success(opts?.message ?? 'Order updated.', {
+      label: 'Undo',
+      onClick: () => commitRecords(before),
+    })
   }
 
   // A fresh mode switch loads that mode's own records.
@@ -563,6 +585,13 @@ function AppInner() {
             {page === 'suppliers' && <SuppliersPage data={data} />}
             {page === 'customers' && <CustomersPage data={data} />}
             {page === 'compare' && <ComparePage data={data} />}
+            {page === 'orders' && (
+              <OrdersPage
+                data={data}
+                onNavigate={(target) => setPage(target)}
+                onOrderAction={updateOrder}
+              />
+            )}
             {page === 'quotes' && (
               <QuoteBuilderPage
                 data={data}

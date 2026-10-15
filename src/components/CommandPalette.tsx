@@ -116,7 +116,15 @@ export function CommandPalette({
       run: go('quotes'),
     }))
 
-    return [...nav, ...suppliers, ...customers, ...quotes]
+    const orders: PaletteEntry[] = data.orders.map((o) => ({
+      id: `ord-${o.id}`,
+      group: 'Orders',
+      label: `${o.id} · ${data.customers.find((c) => c.id === o.customerId)?.name ?? 'Customer'}`,
+      hint: `GH₵${o.valueGhs.toLocaleString('en-GB')} · ${o.stage}`,
+      run: go('orders', o.id),
+    }))
+
+    return [...nav, ...suppliers, ...customers, ...quotes, ...orders]
   }, [data, onClose, onNavigate])
 
   const results = useMemo<PaletteResult[]>(() => {

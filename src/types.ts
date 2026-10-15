@@ -134,6 +134,17 @@ export interface OrderLine {
   unitGhs: number;
 }
 
+export type DeliveryCondition = 'complete' | 'short' | 'damaged';
+
+/** Receipt & discrepancy capture — recorded when an order is delivered. */
+export interface DeliveryReceipt {
+  /** ISO date the goods physically reached the customer. */
+  on: string;
+  condition: DeliveryCondition;
+  /** Short-delivery / damage detail; note it whenever condition !== 'complete'. */
+  note?: string;
+}
+
 export interface Order {
   id: string;
   customerId: string;
@@ -147,6 +158,8 @@ export interface Order {
   expectedDelivery?: string;
   /** Set when the order reaches delivered or settled. */
   completedOn?: string;
+  /** Populated by the delivery step on the Orders pipeline. */
+  receipt?: DeliveryReceipt;
   notes?: string;
 }
 
