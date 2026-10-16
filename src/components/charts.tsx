@@ -24,16 +24,18 @@ export function ChartCard({
   children,
   className = '',
   action,
+  hud = false,
 }: {
   title: string
   sub?: string
   children: ReactNode
   className?: string
   action?: ReactNode
+  hud?: boolean
 }) {
   return (
     <section
-      className={`min-w-0 rounded-xl border border-line bg-surface p-5 shadow-sm ${className}`}
+      className={`min-w-0 rounded-xl border border-line bg-surface p-5 shadow-sm ${hud ? 'hud-panel' : ''} ${className}`}
     >
       <header className="flex items-start justify-between gap-3">
         <div className="min-w-0">

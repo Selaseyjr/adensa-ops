@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   AlertTriangle,
   ArrowRight,
@@ -20,7 +20,6 @@ import {
   ALERT_AMBER,
   CATEGORY_COLORS,
   CATEGORY_SHORT,
-  SUCCESS_BLUE,
 } from '../lib/colors'
 import { ChartCard } from '../components/charts'
 import { EmptyState } from '../components/states'
@@ -67,6 +66,19 @@ export function DashboardPage({
     month: 'long',
   })
   const [kpiDetail, setKpiDetail] = useState<KpiDetailKey | null>(null)
+
+  // The command band (map centred, KPIs flanking) is a desktop-only
+  // composition. Render ONE branch: CSS-hiding both would mount two
+  // Leaflet maps and double every user's tile traffic.
+  const [isXl, setIsXl] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(min-width: 1280px)').matches,
+  )
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1280px)')
+    const onChange = (e: MediaQueryListEvent) => setIsXl(e.matches)
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
 
   const today = new Date()
   const todayStr = localIso(today)
@@ -312,10 +324,66 @@ export function DashboardPage({
     { label: 'Delivered', value: deliveredMonth },
   ]
 
+  // KPI cards for the command band. Tone is the card's identity: gold for
+  // revenue and cash are money (gold), ops cards are deep blue,
+  // ops, amber for alerts. flex-1 lets the band columns stretch them evenly
+  // (harmless in the stacked grid below xl). Two map sizes: the band uses
+  // half-height (180), the stacked layout the full 360.
+  const kpiRevenue = (
+    <StatCard
+      icon={TrendingUp}
+      tone="var(--color-gold-600)"
+      hud
+      hudHero
+      className="flex-1"
+      label="Revenue"
+      onClick={() => setKpiDetail('revenue')}
+      value={ghs(revenueMonth)}
+      sub={target > 0 ? `${ghs(target)} target for ${monthName}` : `Completed in ${monthName}`}
+      trend={target > 0 ? { dir: onPace ? 'up' : 'down', label: onPace ? 'ahead of pace' : 'behind pace' } : undefined}
+    />
+  )
+  const kpiCash = (
+    <StatCard
+      icon={Wallet}
+      tone="var(--color-gold-600)"
+      hud
+      className="flex-1"
+      label="Cash available"
+      onClick={() => setKpiDetail('cash')}
+      value={ghs(cashAvailable)}
+      sub={`GH¢${receivable.toLocaleString('en-GH')} receivable`}
+      spark={balanceSpark}
+    />
+  )
+  const kpiOrders = (
+    <StatCard icon={PackageSearch} tone="#1d4ed8" hud className="flex-1" label="Orders in motion" onClick={() => setKpiDetail('orders')} value={inMotion.length} sub={`GH¢${inMotionValue.toLocaleString('en-GH')} in play`} />
+  )
+  const kpiQuotes = (
+    <StatCard icon={Tag} tone="#0ea5e9" hud className="flex-1" label="Open quotes" onClick={() => setKpiDetail('quotes')} value={openQuotes.length} sub={openQuotes.length > 0 ? `${ghs(openQuotesValue)} awaiting response` : 'None awaiting response'} />
+  )
+  const kpiInquiries = (
+    <StatCard icon={Bell} tone={ALERT_AMBER} hud className="flex-1" label="Inquiries" onClick={() => setKpiDetail('inquiries')} value={monthInquiries.length} sub={`${newInquiries.length} awaiting reply`} />
+  )
+  // Borderless map: no panel, no title — the map itself is the hero and the
+  // legend carries the context.
+  const mapBand = (
+    <div className="min-w-0">
+      <SupplierMap suppliers={data.suppliers} height={180} />
+      <MapLegend />
+    </div>
+  )
+  const mapWide = (
+    <div className="min-w-0">
+      <SupplierMap suppliers={data.suppliers} height={360} />
+      <MapLegend />
+    </div>
+  )
+
   return (
     <div className="space-y-5">
       {/* Welcome + month target */}
-      <section className="flex flex-col gap-4 rounded-xl border border-line bg-surface p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+      <section className="flex flex-col gap-4 rounded-xl border border-line bg-surface p-5 shadow-sm hud-panel sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           <div className="text-xs font-semibold tracking-widest text-brand-600 dark:text-brand-400">
             AdensaOps
@@ -369,54 +437,39 @@ export function DashboardPage({
         </div>
       </section>
 
-      {/* Executive KPI strip */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-        <StatCard
-          icon={TrendingUp}
-          tone={SUCCESS_BLUE}
-          label="Revenue"
-          onClick={() => setKpiDetail('revenue')}
-          value={ghs(revenueMonth)}
-          sub={target > 0 ? `${ghs(target)} target for ${monthName}` : `Completed in ${monthName}`}
-          trend={target > 0 ? { dir: onPace ? 'up' : 'down', label: onPace ? 'ahead of pace' : 'behind pace' } : undefined}
-        />
-        <StatCard
-          icon={Wallet}
-          tone="#2563eb"
-          label="Cash available"
-          onClick={() => setKpiDetail('cash')}
-          value={ghs(cashAvailable)}
-          sub={`GH¢${receivable.toLocaleString('en-GH')} receivable`}
-          spark={balanceSpark}
-        />
-        <StatCard
-          icon={PackageSearch}
-          tone="#1d4ed8"
-          label="Orders in motion"
-          onClick={() => setKpiDetail('orders')}
-          value={inMotion.length}
-          sub={`GH¢${inMotionValue.toLocaleString('en-GH')} in play`}
-        />
-        <StatCard
-          icon={Tag}
-          tone="#0ea5e9"
-          label="Open quotes"
-          onClick={() => setKpiDetail('quotes')}
-          value={openQuotes.length}
-          sub={openQuotes.length > 0 ? `${ghs(openQuotesValue)} awaiting response` : 'None awaiting response'}
-        />
-        <StatCard
-          icon={Bell}
-          tone={ALERT_AMBER}
-          label="Inquiries"
-          onClick={() => setKpiDetail('inquiries')}
-          value={monthInquiries.length}
-          sub={`${newInquiries.length} awaiting reply`}
-        />
-      </div>
+      {/* Command band (xl+): the supplier map centred at half height with
+          the KPI cards flanking it — the big-screen board arrangement.
+          Below xl the cards stack and the map runs full width beneath. */}
+      {isXl ? (
+        <div className="grid grid-cols-12 items-stretch gap-4">
+        <div className="flex min-w-0 flex-col gap-4 xl:col-span-4">
+          {kpiRevenue}
+          {kpiCash}
+          {kpiOrders}
+        </div>
+        <div className="flex min-w-0 flex-col justify-center gap-4 xl:col-span-4">
+          {mapBand}
+        </div>
+        <div className="flex min-w-0 flex-col gap-4 xl:col-span-4">
+          {kpiQuotes}
+          {kpiInquiries}
+        </div>
+        </div>
+      ) : (
+        <div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {kpiRevenue}
+          {kpiCash}
+          {kpiOrders}
+          {kpiQuotes}
+          {kpiInquiries}
+        </div>
+          <div className="mt-4">{mapWide}</div>
+        </div>
+      )}
 
       {/* Order flow */}
-      <ChartCard title="Order flow" sub="Draft to settled, by stage">
+      <ChartCard title="Order flow" sub="Draft to settled, by stage" hud>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
           {stageStats.map((st) => (
             <div key={st.stage} className="rounded-lg border border-line bg-subtle p-3">
@@ -452,7 +505,7 @@ export function DashboardPage({
           title="Needs attention"
           sub="Oldest items first"
           className="lg:col-span-2"
-        >
+         hud>
           {attention.length === 0 ? (
             <EmptyState icon={CheckCircle2} title="Nothing needs attention." />
           ) : (
@@ -482,7 +535,7 @@ export function DashboardPage({
           )}
         </ChartCard>
 
-        <ChartCard title="Today" sub={today.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' })}>
+        <ChartCard title="Today" sub={today.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' })} hud>
           {todayItems.length === 0 ? (
             <EmptyState icon={CalendarClock} title="Nothing scheduled today." />
           ) : (
@@ -511,22 +564,22 @@ export function DashboardPage({
 
       {/* Cash timing + demand to delivery */}
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-        <ChartCard title="Cash timing" sub={`${monthName} to date`}>
+        <ChartCard title="Cash timing" sub={`${monthName} to date`} hud>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <div className="text-[10px] font-semibold uppercase tracking-wide text-ink-faint">
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-gold-600 dark:text-gold-400">
                 Money in
               </div>
-              <div className="mt-1 text-lg font-bold text-ink">{ghs(cashIn)}</div>
+              <div className="mt-1 text-lg font-bold text-gold-600 dark:text-gold-400">{ghs(cashIn)}</div>
               <div className="text-[11px] text-ink-faint">
                 {monthCash.filter((c) => c.kind.endsWith('_in')).length} entries
               </div>
             </div>
             <div>
-              <div className="text-[10px] font-semibold uppercase tracking-wide text-ink-faint">
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-brand-700 dark:text-brand-400">
                 Money out
               </div>
-              <div className="mt-1 text-lg font-bold text-ink">{ghs(cashOut)}</div>
+              <div className="mt-1 text-lg font-bold text-brand-700 dark:text-brand-400">{ghs(cashOut)}</div>
               <div className="text-[11px] text-ink-faint">
                 {monthCash.filter((c) => c.kind.endsWith('_out')).length} entries
               </div>
@@ -543,7 +596,7 @@ export function DashboardPage({
           )}
         </ChartCard>
 
-        <ChartCard title="Demand to delivery" sub="Inquiries through to completed orders">
+        <ChartCard title="Demand to delivery" sub="Inquiries through to completed orders" hud>
           <div className="grid grid-cols-4 gap-2 text-center">
             {demandSteps.map((s) => (
               <div key={s.label} className="rounded-lg bg-subtle p-3">
@@ -559,12 +612,6 @@ export function DashboardPage({
           )}
         </ChartCard>
       </div>
-
-      {/* Supplier network */}
-      <ChartCard title="Supplier network" sub="Where the pipeline sits across Ghana">
-        <SupplierMap suppliers={data.suppliers} height={300} />
-        <MapLegend />
-      </ChartCard>
 
       {/* KPI drill-down */}
       {kpiDetail && (

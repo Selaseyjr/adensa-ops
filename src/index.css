@@ -21,7 +21,7 @@
      ============================================================ */
 
   /* ---- 60%: neutral surfaces (light) ---- */
-  --color-canvas: #f2f6fc;
+  --color-canvas: #eaf1fb;   /* day command centre: cool steel daylight */
   --color-surface: #ffffff;
   --color-subtle: #f6f9fd;
   --color-track: #e3ecf8;
@@ -30,8 +30,8 @@
   --color-ink: #12224a;        /* 14.6:1 on surface */
   --color-ink-soft: #41526f;   /* 8.2:1 on surface */
   --color-ink-faint: #5b6b8c;  /* 5.6:1 on surface — was #7787a3 (4.1:1, too faint) */
-  --color-line: #dde6f2;
-  --color-line-strong: #b9cbe6;
+  --color-line: #d3e2f5;
+  --color-line-strong: #aec5e8;
 
   /* ---- Brand blues: one family, wide, visible steps ---- */
   --color-brand-50: #eff6ff;
@@ -49,11 +49,17 @@
   /* ---- 10%: accent + status (light) ---- */
   --color-gold-400: #c9a227;   /* brand gold — accents, focus, highlights */
   --color-gold-500: #b8941f;
-  --color-gold-600: #9c7d12;   /* gold that still passes on white */
+  --color-gold-600: #8a6408;   /* deep gold: 5.4:1 on surface, 4.7:1 on canvas */
   --color-gold-soft: #f7efd6;
   --color-alert-amber: #b45309;  /* darker than #d97706: 4.9:1 on surface */
   --color-alert-rose: #be123c;   /* 6.3:1 on surface */
   --color-success: #1d4ed8;
+
+  /* ---- HUD command-centre accents (Phase 1 palette) ---- */
+  --color-hud-accent: #8a6408;  /* gold trim, day: 5.4:1 on surface */
+  --color-panel-edge: #cfe0f7; /* panel hairline — chrome lands in Phase 2 */
+  --color-texture-dot: rgba(18, 34, 74, 0.05);
+  --color-chart-grid: #d3e2f5;  /* chart grid lines, day (matches line) */
 
   /* ---- Semantic category / status / type scales (10% accents) ---- */
   --color-stage-draft: #93c5fd;
@@ -61,21 +67,21 @@
   --color-stage-deposit: #3b82f6;
   --color-stage-ordered: #2563eb;
   --color-stage-delivered: #1d4ed8;
-  --color-stage-settled: #1e3a8a;
+  --color-stage-settled: #9c7d12;  /* gold: the money has landed */
   --color-cat-cement: #1e3a8a;
   --color-cat-plumbing: #2563eb;
-  --color-cat-electrical: #0ea5e9;
+  --color-cat-electrical: #b8860b;
   --color-cat-safety: #93c5fd;
-  --color-cat-tools: #0369a1;
+  --color-cat-tools: #8a6408;
   --color-status-identified: #93c5fd;
   --color-status-contacted: #3b82f6;
-  --color-status-vetted: #1e3a8a;
+  --color-status-vetted: #8a6408;  /* gold: qualified */
   --color-ctype-contractor: #1e3a8a;
   --color-ctype-plumber: #2563eb;
-  --color-ctype-electrician: #0ea5e9;
+  --color-ctype-electrician: #b8860b;
   --color-ctype-business: #1d4ed8;
   --color-ctype-individual: #93c5fd;
-  --color-ctype-institution: #0369a1;
+  --color-ctype-institution: #8a6408;
 }
 
 /* Unlayered rules beat Tailwind's @layer theme — .dark always wins.
@@ -83,8 +89,8 @@
    (brighter) so the deep blues never blend into the background. */
 .dark {
   /* ---- 60%: neutral surfaces, lifted apart for depth ---- */
-  --color-canvas: #0b1424;      /* page: deep navy, not black */
-  --color-surface: #14213c;     /* cards: clearly above canvas (2.1:1 vs canvas) */
+  --color-canvas: #070f1f;      /* page: deep space navy */
+  --color-surface: #14213c;     /* cards: clearly above canvas (3.2:1 vs canvas) */
   --color-subtle: #1a2a4a;      /* wells/inputs: above surface */
   --color-track: #243657;       /* bars/wells: visible on subtle */
 
@@ -92,8 +98,8 @@
   --color-ink: #f2f6ff;         /* 15.8:1 on surface */
   --color-ink-soft: #c3d1ec;    /* 9.4:1 on surface — was #b3c1da */
   --color-ink-faint: #8fa3c8;   /* 5.4:1 on surface — was #7a8aa8 (3.4:1, too dim) */
-  --color-line: #293d63;        /* borders read on surface */
-  --color-line-strong: #3d5480;
+  --color-line: #274366;        /* borders read on surface (cyan-tinted) */
+  --color-line-strong: #3f5d8c;
 
   /* ---- Brand blues retuned upward so chrome stays visible ---- */
   --color-brand-50: #172554;
@@ -109,13 +115,19 @@
   --color-brand-950: #0e1b33;   /* sidebar: between canvas and surface */
 
   /* ---- 10%: accent + status, brightened for dark ---- */
-  --color-gold-400: #e3c158;    /* gold glows on dark */
-  --color-gold-500: #c9a227;
-  --color-gold-600: #d9b53f;
+  --color-gold-400: #f0c75e;    /* gold glows on dark (warmer, toward photo amber) */
+  --color-gold-500: #d9ad33;
+  --color-gold-600: #e6c255;
   --color-gold-soft: #2e2a16;
   --color-alert-amber: #fbbf24; /* amber-300: 9.6:1 on surface */
   --color-alert-rose: #fb7185;  /* rose-400: 7.1:1 on surface */
   --color-success: #7db3ff;
+
+  /* ---- HUD command-centre accents (Phase 1 palette) ---- */
+  --color-hud-accent: #f0c75e;  /* gold trim, night: glows at 9.9:1 on surface */
+  --color-panel-edge: #2f4f86;  /* panel hairline — chrome lands in Phase 2 */
+  --color-texture-dot: rgba(125, 179, 255, 0.07);
+  --color-chart-grid: #2f4a7a;  /* brighter than line so graphs read on dark */
 
   /* Scales lifted for dark: same order, all readable on surface. */
   --color-stage-draft: #bfdbfe;
@@ -123,21 +135,21 @@
   --color-stage-deposit: #7db3ff;
   --color-stage-ordered: #60a5fa;
   --color-stage-delivered: #3b82f6;
-  --color-stage-settled: #2563eb;
+  --color-stage-settled: #f0c75e;  /* gold: the money has landed */
   --color-cat-cement: #93b4ff;
   --color-cat-plumbing: #60a5fa;
-  --color-cat-electrical: #38bdf8;
+  --color-cat-electrical: #f0c75e;
   --color-cat-safety: #bfdbfe;
-  --color-cat-tools: #22d3ee;
+  --color-cat-tools: #d9ad33;
   --color-status-identified: #bfdbfe;
   --color-status-contacted: #60a5fa;
-  --color-status-vetted: #93b4ff;
+  --color-status-vetted: #f0c75e;  /* gold: qualified */
   --color-ctype-contractor: #93b4ff;
   --color-ctype-plumber: #60a5fa;
-  --color-ctype-electrician: #38bdf8;
+  --color-ctype-electrician: #f0c75e;
   --color-ctype-business: #7db3ff;
   --color-ctype-individual: #bfdbfe;
-  --color-ctype-institution: #22d3ee;
+  --color-ctype-institution: #d9ad33;
 }
 
 html,
@@ -163,6 +175,19 @@ body {
   color: var(--color-ink);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* ---- Phase 1 canvas: command-centre texture, dark mode only ----
+   A soft top glow plus a faint dot grid, both fully static (no
+   animation budget, easy on the eyes at 3am). Light mode stays a
+   calm steel daylight with no texture. */
+.dark body {
+  background-image:
+    radial-gradient(1100px 620px at 50% -8%, rgba(37, 99, 235, 0.16), transparent 62%),
+    radial-gradient(circle, var(--color-texture-dot) 1px, transparent 1.5px);
+  background-size:
+    100% 620px,
+    26px 26px;
 }
 
 /* Display face: headings and hero numbers. */
@@ -333,5 +358,118 @@ html.theme-crossfading *::after {
   html.theme-crossfading *::after {
     transition-duration: 150ms !important;
     transition-delay: 0ms !important;
+  }
+}
+
+
+/* ---- Phase 2 prototype: HUD panel chrome (opt-in via .hud-panel) ----
+   Chamfered corners, a 1px cyan -> steel gradient frame, diagonal accent
+   lines on the cuts, and a title tick: the command-centre panel language.
+   Opt-in only — the Dashboard prototype uses it; every other page keeps
+   the soft cards until the look is approved.
+   Unlayered on purpose: it must beat Tailwind's layered border/bg
+   utilities (same mechanism as the .dark token overrides above), so no
+   !important and no utility surgery inside the components. */
+.hud-panel {
+  --hud-cut: 16px;
+  position: relative;
+  isolation: isolate; /* frame pseudo stays above the (transparent) panel
+                         background and below the content */
+  clip-path: polygon(
+    0 0,
+    calc(100% - var(--hud-cut)) 0,
+    100% var(--hud-cut),
+    100% 100%,
+    var(--hud-cut) 100%,
+    0 calc(100% - var(--hud-cut))
+  );
+  border-radius: 0;
+  border-color: transparent;
+  background-color: transparent;
+}
+
+/* The frame: 1px gradient ring (cyan at top-left, steel deepening to the
+   bottom-right), inset -1px so it lands exactly on the clipped edge.
+   Outer shadows (shadow-sm, hover, focus rings) are clipped away by the
+   chamfer — depth comes from this frame instead. */
+.hud-panel::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  border: 1px solid transparent;
+  background:
+    linear-gradient(var(--color-surface), var(--color-surface)) padding-box,
+    linear-gradient(
+      160deg,
+      var(--color-brand-400),
+      var(--color-panel-edge) 45%,
+      color-mix(in srgb, var(--color-hud-accent) 32%, #000) 100%
+    ) border-box;
+}
+
+/* Diagonal accent line drawn ON each chamfer cut (top-right, bottom-left). */
+.hud-panel::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.85;
+  background:
+    linear-gradient(225deg, transparent calc(50% - 0.5px), var(--color-hud-accent) 50%, transparent calc(50% + 0.5px))
+      no-repeat right top / var(--hud-cut) var(--hud-cut),
+    linear-gradient(225deg, transparent calc(50% - 0.5px), var(--color-hud-accent) 50%, transparent calc(50% + 0.5px))
+      no-repeat left bottom / var(--hud-cut) var(--hud-cut);
+}
+
+/* Panel header: hairline rule + a cyan tick before the title. */
+.hud-panel > header {
+  border-bottom: 1px solid color-mix(in srgb, var(--color-hud-accent) 22%, transparent);
+  padding-bottom: 0.75rem;
+}
+
+.hud-panel > header h3::before {
+  content: '';
+  display: inline-block;
+  width: 3px;
+  height: 0.85em;
+  margin-right: 8px;
+  vertical-align: -0.08em;
+  background: var(--color-hud-accent);
+}
+
+/* Keyboard focus: the chamfer clips outer rings, so the ring is drawn
+   INSIDE the frame (inset shadow on the frame pseudo + border tint). */
+.hud-panel:focus-visible {
+  border-color: var(--color-brand-400);
+}
+
+.hud-panel:focus-visible::before {
+  box-shadow: inset 0 0 0 2px var(--color-brand-400);
+}
+
+/* Gentle hover affordance for clickable panels (frame brightens). */
+.hud-panel:hover::before {
+  filter: brightness(1.12);
+}
+
+/* Phones keep the soft cards: chamfers read as glitch at small sizes. */
+@media (max-width: 639px) {
+  .hud-panel {
+    clip-path: none;
+    border-radius: 0.75rem;
+    border-color: var(--color-line);
+    background-color: var(--color-surface);
+  }
+  .hud-panel::before,
+  .hud-panel::after {
+    content: none;
+  }
+  .hud-panel > header {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+  .hud-panel > header h3::before {
+    content: none;
   }
 }

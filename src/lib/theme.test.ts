@@ -31,9 +31,9 @@ describe('applyTheme', () => {
     document.head.appendChild(meta)
 
     applyTheme('dark')
-    expect(meta.getAttribute('content')).toBe('#0B1424')
+    expect(meta.getAttribute('content')).toBe('#070F1F')
     applyTheme('light')
-    expect(meta.getAttribute('content')).toBe('#F2F6FC')
+    expect(meta.getAttribute('content')).toBe('#EAF1FB')
   })
 
   it('never throws when the theme-color meta is absent', () => {

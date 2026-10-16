@@ -321,7 +321,7 @@ function AppInner() {
     // Slow smooth crossfade: a veil of the incoming canvas colour fades in,
     // the theme swaps underneath it at full cover, then the veil lifts.
     veil.style.transition = 'opacity 450ms ease'
-    veil.style.backgroundColor = next === 'dark' ? '#0b1424' : '#f2f6fc'
+    veil.style.backgroundColor = next === 'dark' ? '#070f1f' : '#eaf1fb'
     veil.style.opacity = '1'
     window.setTimeout(() => {
       applyTheme(next)

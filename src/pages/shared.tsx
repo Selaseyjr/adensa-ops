@@ -107,6 +107,9 @@ export function StatCard({
   spark,
   onClick,
   hint = 'View details',
+  hud = false,
+  hudHero = false,
+  className = '',
 }: {
   icon: LucideIcon
   tone: string
@@ -118,21 +121,37 @@ export function StatCard({
   spark?: number[]
   onClick?: () => void
   hint?: string
+  hud?: boolean
+  hudHero?: boolean
+  className?: string
 }) {
+  // Pop-out treatment (hud mode): a tone-tinted gradient wash + a 2px tone
+  // accent along the chamfered top edge, so KPI cards lift off the canvas.
+  const pop = hud
+    ? {
+        backgroundImage: `linear-gradient(165deg, color-mix(in srgb, ${tone} 14%, var(--color-surface)), var(--color-surface) 58%)`,
+        borderTop: `2px solid color-mix(in srgb, ${tone} 62%, transparent)`,
+      }
+    : undefined
   const body = (
     <>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="text-xs font-medium uppercase tracking-wide text-ink-faint">{label}</div>
-          <div className={`num mt-1 text-2xl font-bold ${alert ? 'text-rose-600 dark:text-rose-400' : 'text-ink'}`}>
+          <div
+            className={`num mt-1 text-2xl font-bold ${
+              alert ? 'text-rose-600 dark:text-rose-400' : hudHero ? 'text-gold-600 dark:text-gold-400' : 'text-ink'
+            }`}
+          >
             {value}
           </div>
         </div>
         <div
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
+          className={`flex h-9 w-9 shrink-0 items-center justify-center ${hud ? 'rounded-full' : 'rounded-lg'}`}
           style={{
-            backgroundColor: `color-mix(in srgb, ${tone} 14%, transparent)`,
+            backgroundColor: `color-mix(in srgb, ${tone} ${hud ? 22 : 14}%, transparent)`,
             color: tone,
+            ...(hud ? { boxShadow: `0 0 0 1px color-mix(in srgb, ${tone} 38%, transparent)` } : {}),
           }}
         >
           <Icon size={18} />
@@ -151,7 +170,7 @@ export function StatCard({
           {trend.label}
         </div>
       )}
-      {spark && <Sparkline data={spark} />}
+      {spark && <Sparkline data={spark} color={hud ? 'var(--color-gold-600)' : undefined} />}
       {onClick && (
         <div className="mt-2.5 flex items-center gap-1 text-[11px] font-medium text-ink-faint transition-colors group-hover:text-brand-600 dark:group-hover:text-brand-400">
           {hint}
@@ -161,7 +180,7 @@ export function StatCard({
     </>
   )
   if (!onClick) {
-    return <div className="min-w-0 rounded-xl border border-line bg-surface p-4 shadow-sm">{body}</div>
+    return <div className={`min-w-0 rounded-xl border border-line bg-surface p-4 shadow-sm ${hud ? 'hud-panel' : ''} ${className}`} style={pop}>{body}</div>
   }
   return (
     <button
@@ -169,7 +188,8 @@ export function StatCard({
       onClick={onClick}
       aria-haspopup="dialog"
       aria-label={`${label}. ${hint}`}
-      className="group min-w-0 w-full rounded-xl border border-line bg-surface p-4 text-left shadow-sm transition hover:border-brand-300 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 dark:hover:border-brand-700"
+      className={`group min-w-0 w-full rounded-xl border border-line bg-surface p-4 text-left shadow-sm transition hover:border-brand-300 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 dark:hover:border-brand-700 ${hud ? 'hud-panel' : ''} ${className}`}
+      style={pop}
     >
       {body}
     </button>

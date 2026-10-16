@@ -52,7 +52,7 @@ export const CUSTOMER_TYPE_COLORS: Record<string, string> = {
 // CSS variables so charts restyle themselves in dark mode with no prop
 // drilling — the <html class="dark"> switch flips them via index.css.
 
-export const CHART_GRID = 'var(--color-line)'; // grid + axis lines
+export const CHART_GRID = 'var(--color-chart-grid)'; // grid + axis lines (per-theme, tuned to pop on dark)
 export const CHART_AXIS = 'var(--color-ink-faint)'; // tick text
 export const CHART_LABEL = 'var(--color-ink-soft)'; // emphasised tick text
 export const CHART_TOOLTIP_STYLE: CSSProperties = {
