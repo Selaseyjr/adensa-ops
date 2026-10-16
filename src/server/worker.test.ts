@@ -192,3 +192,64 @@ describe('worker: D1 round trip', () => {
     expect(res.status).toBe(500)
   })
 })
+
+describe('worker: CORS for the Vercel frontend', () => {
+  const VERCEL = 'https://adensaops.vercel.app'
+
+  it('answers a preflight from the production origin', async () => {
+    const res = await call('/api/records?mode=demo', {
+      method: 'OPTIONS',
+      headers: {
+        Origin: VERCEL,
+        'Access-Control-Request-Method': 'PUT',
+        'Access-Control-Request-Headers': 'content-type',
+      },
+    })
+    expect(res.status).toBe(204)
+    expect(res.headers.get('access-control-allow-origin')).toBe(VERCEL)
+    expect(res.headers.get('access-control-allow-methods')).toContain('PUT')
+    expect(res.headers.get('access-control-allow-headers')).toContain('content-type')
+  })
+
+  it('answers a preflight from a per-deploy preview origin', async () => {
+    const origin = 'https://adensaops-bd8lb14ni-selasey.vercel.app'
+    const res = await call('/api/records?mode=demo', { method: 'OPTIONS', headers: { Origin: origin } })
+    expect(res.status).toBe(204)
+    expect(res.headers.get('access-control-allow-origin')).toBe(origin)
+  })
+
+  it('403s a preflight from a foreign origin', async () => {
+    const res = await call('/api/records?mode=demo', {
+      method: 'OPTIONS',
+      headers: { Origin: 'https://evil.example' },
+    })
+    expect(res.status).toBe(403)
+    expect(res.headers.get('access-control-allow-origin')).toBeNull()
+  })
+
+  it('allows writes from the allowlisted origin and echoes CORS', async () => {
+    const db = fakeDb()
+    const res = await call(
+      '/api/records?mode=demo',
+      { method: 'PUT', body: JSON.stringify({ quotes: [{ id: 'QT-C1' }] }), headers: { Origin: VERCEL } },
+      db,
+    )
+    expect(res.status).toBe(200)
+    expect(res.headers.get('access-control-allow-origin')).toBe(VERCEL)
+    expect(res.headers.get('vary')).toContain('Origin')
+    expect(JSON.parse(db.rows.get('demo')!.payload).quotes[0].id).toBe('QT-C1')
+  })
+
+  it('exposes reads to the allowlisted origin with CORS headers', async () => {
+    const res = await call('/api/records?mode=demo', { headers: { Origin: VERCEL } })
+    expect(res.status).toBe(200)
+    expect(res.headers.get('access-control-allow-origin')).toBe(VERCEL)
+  })
+
+  it('grants no CORS headers to foreign origins on reads', async () => {
+    const res = await call('/api/records?mode=demo', { headers: { Origin: 'https://evil.example' } })
+    expect(res.status).toBe(200)
+    expect(res.headers.get('access-control-allow-origin')).toBeNull()
+  })
+})
+

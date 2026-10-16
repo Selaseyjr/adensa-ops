@@ -206,3 +206,64 @@ describe('createPushQueue', () => {
     vi.useRealTimers()
   })
 })
+
+// Shared-worker fallback: production hosts that serve the SPA without a
+// worker (Vercel) fall back to the shared D1 worker. Kept last in the file so
+// the remembered API base from these tests cannot reorder earlier assertions.
+describe('shared-worker fallback', () => {
+  const SHARED = 'https://shared.example/api/records'
+  const html = () =>
+    new Response('<html>index</html>', { status: 200, headers: { 'content-type': 'text/html' } })
+  const api = (body: unknown) =>
+    new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } })
+
+  it('reads through the shared API after the same-origin host has no API', async () => {
+    const records = { ...EMPTY, quotes: [quote('QT-500')] }
+    const fetchMock = vi.fn(async (url: string) => (String(url).startsWith(SHARED) ? api({ ok: true, records }) : html()))
+    vi.stubGlobal('fetch', fetchMock)
+    const got = await fetchRemoteRecords('demo', SHARED)
+    expect(got?.quotes[0].id).toBe('QT-500')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    const [secondUrl] = fetchMock.mock.calls[1] as unknown as [string]
+    expect(String(secondUrl)).toBe(`${SHARED}?mode=demo`)
+  })
+
+  it('pushes through the shared API when the same-origin host has no API', async () => {
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) =>
+      init && init.method === 'PUT' && String(url).startsWith(SHARED) ? api({ ok: true }) : html(),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    const ok = await pushRecords('demo', { ...EMPTY, quotes: [quote('QT-501')] }, SHARED)
+    expect(ok).toBe(true)
+    const put = fetchMock.mock.calls.find(([, init]) => init && init.method === 'PUT')
+    expect(put).toBeTruthy()
+    expect(String((put as unknown as [string])[0])).toBe(`${SHARED}?mode=demo`)
+  })
+
+  it('gives up cleanly when neither host has an API', async () => {
+    const fetchMock = vi.fn(async () => html())
+    vi.stubGlobal('fetch', fetchMock)
+    expect(await fetchRemoteRecords('demo', SHARED)).toBeNull()
+    expect(await pushRecords('demo', EMPTY, SHARED)).toBe(false)
+    // Two candidate bases per operation, no throws.
+    expect(fetchMock).toHaveBeenCalledTimes(4)
+  })
+
+  it('hydrate merges through the shared API end to end', async () => {
+    const remote: LocalRecords = { ...EMPTY, quotes: [quote('QT-502')] }
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (String(url).startsWith(SHARED)) {
+        return init && init.method === 'PUT' ? api({ ok: true }) : api({ ok: true, records: remote })
+      }
+      return html()
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const local: LocalRecords = { ...EMPTY, quotes: [quote('QT-001')] }
+    let applied: LocalRecords | null = null
+    const out = await hydrateRecords('demo', local, (m) => { applied = m }, SHARED)
+    expect(applied).not.toBeNull()
+    expect(out.quotes.map((q) => q.id).sort()).toEqual(['QT-001', 'QT-502'])
+    expect(fetchMock.mock.calls.some(([, init]) => init && init.method === 'PUT')).toBe(true)
+  })
+})
+
