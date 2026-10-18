@@ -24,6 +24,7 @@ import {
   CheckCircle2,
   ChevronRight,
   ClipboardCheck,
+  Download,
   PackageCheck,
   Search,
   Send,
@@ -31,6 +32,7 @@ import {
   Wallet,
 } from 'lucide-react'
 import type { Dataset } from '../lib/dataSource'
+import { downloadInvoicePdf } from '../lib/invoice'
 import type { NotificationTarget } from '../lib/notifications'
 import { ALERT_AMBER, ALERT_ROSE, SUCCESS_BLUE } from '../lib/colors'
 import { EmptyState } from '../components/states'
@@ -579,9 +581,18 @@ export function OrdersPage({
           sub={`Opened ${open.receivedOn} · ${open.lines.length} line${open.lines.length === 1 ? '' : 's'}`}
           onClose={closeOrder}
           footer={
-            <span className="flex items-center gap-1.5">
-              <CheckCircle2 size={12} className="text-success" aria-hidden="true" />
-              Every stage change and payment can be undone from the toast.
+            <span className="flex flex-wrap items-center justify-between gap-2">
+              <span className="flex items-center gap-1.5">
+                <CheckCircle2 size={12} className="text-success" aria-hidden="true" />
+                Every stage change and payment can be undone from the toast.
+              </span>
+              <button
+                type="button"
+                onClick={() => downloadInvoicePdf(open, data.customers)}
+                className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-[11px] font-medium text-ink transition hover:bg-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300"
+              >
+                <Download size={13} aria-hidden="true" /> Invoice PDF
+              </button>
             </span>
           }
         >

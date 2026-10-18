@@ -168,3 +168,64 @@ test.describe('navigation and console health', () => {
     })
   }
 })
+
+test.describe('document downloads', () => {
+  // Invoices and receipts are real files, not print views: assert the browser
+  // receives a download whose bytes actually start with the PDF magic number.
+  test('order invoice downloads as a branded PDF', async ({ page }) => {
+    const errors = watchErrors(page)
+    await page.goto('/orders')
+    await page.getByRole('button', { name: /^Open ORD-/ }).first().click()
+    const dialog = page.getByRole('dialog')
+    await expect(dialog).toBeVisible()
+
+    const downloadPromise = page.waitForEvent('download')
+    await dialog.getByRole('button', { name: 'Invoice PDF' }).click()
+    const download = await downloadPromise
+    expect(download.suggestedFilename()).toMatch(/^ADENSA-INV-ORD-\d+\.pdf$/)
+
+    const path = await download.path()
+    expect(path).toBeTruthy()
+    const { readFileSync } = await import('node:fs')
+    const bytes = readFileSync(path!)
+    expect(bytes.subarray(0, 4).toString()).toBe('%PDF')
+    expect(bytes.byteLength).toBeGreaterThan(1000)
+
+    expect(errors).toEqual([])
+  })
+
+  test('cash ledger row downloads a receipt PDF', async ({ page }) => {
+    const errors = watchErrors(page)
+    await page.goto('/cash')
+
+    // On phone the ledger sits far down a tall stacked page while the live
+    // simulation re-renders the KPI cards and charts above it every couple of
+    // seconds; Chrome's scroll anchoring then moves the page between
+    // Playwright's scroll and its mouse event, so a bare click() keeps landing
+    // on whatever scrolled into that spot. Scroll explicitly, let any
+    // in-flight tick settle, verify the button is the top element at its own
+    // centre (a real hit-target check), then click without re-hit-testing.
+    const receiptBtn = page.getByRole('button', { name: /^Download receipt / }).first()
+    await receiptBtn.waitFor({ state: 'visible' })
+    await receiptBtn.scrollIntoViewIfNeeded()
+    await page.waitForTimeout(400)
+    const hitsOwnCentre = await receiptBtn.evaluate((el) => {
+      const r = el.getBoundingClientRect()
+      const top = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)
+      return top === el || el.contains(top)
+    })
+    expect(hitsOwnCentre).toBe(true)
+    const downloadPromise = page.waitForEvent('download')
+    await receiptBtn.click({ force: true })
+    const download = await downloadPromise
+    expect(download.suggestedFilename()).toMatch(/^ADENSA-RCT-.+\.pdf$/)
+
+    const path = await download.path()
+    expect(path).toBeTruthy()
+    const { readFileSync } = await import('node:fs')
+    const bytes = readFileSync(path!)
+    expect(bytes.subarray(0, 4).toString()).toBe('%PDF')
+
+    expect(errors).toEqual([])
+  })
+})

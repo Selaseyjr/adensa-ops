@@ -19,11 +19,13 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   Banknote,
+  Download,
   Plus,
   Search,
   Wallet,
 } from 'lucide-react'
 import type { Dataset } from '../lib/dataSource'
+import { downloadReceiptPdf } from '../lib/invoice'
 import type { NotificationTarget } from '../lib/notifications'
 import { ALERT_AMBER, ALERT_ROSE, SUCCESS_BLUE } from '../lib/colors'
 import { ChartCard, DonutChart, type DonutSlice } from '../components/charts'
@@ -535,7 +537,7 @@ export function CashTrackerPage({
           )
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] border-collapse text-sm">
+            <table className="w-full min-w-[780px] border-collapse text-sm">
               <thead>
                 <tr className="border-b border-line text-[11px] uppercase tracking-wide text-ink-faint">
                   <SortableTh label="Date" sortKey="date" sort={sort} onToggle={toggle} />
@@ -548,6 +550,9 @@ export function CashTrackerPage({
                     Out
                   </th>
                   <SortableTh label="Balance" sortKey="balance" sort={sort} onToggle={toggle} align="right" />
+                  <th scope="col" className="px-4 py-3 text-right">
+                    <span className="sr-only">Receipt</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -580,6 +585,16 @@ export function CashTrackerPage({
                       {!isIn(entry.kind) ? `−${ghs(entry.ghs)}` : ''}
                     </td>
                     <td className="num px-4 py-2.5 text-right text-ink-soft">{ghs(running)}</td>
+                    <td className="px-4 py-2.5 text-right">
+                      <button
+                        type="button"
+                        onClick={() => downloadReceiptPdf(entry, data.orders, data.customers)}
+                        aria-label={`Download receipt ${entry.id}`}
+                        className="rounded-lg p-1.5 text-ink-faint transition hover:bg-subtle hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300"
+                      >
+                        <Download size={14} aria-hidden="true" />
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>

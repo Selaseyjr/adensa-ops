@@ -327,8 +327,8 @@ export function DashboardPage({
   // KPI cards for the command band. Tone is the card's identity: gold for
   // revenue and cash are money (gold), ops cards are deep blue,
   // ops, amber for alerts. flex-1 lets the band columns stretch them evenly
-  // (harmless in the stacked grid below xl). Two map sizes: the band uses
-  // half-height (180), the stacked layout the full 360.
+  // (harmless in the stacked grid below xl). Two map sizes: the band map
+  // fills its column height, the stacked layout uses a fixed 360.
   const kpiRevenue = (
     <StatCard
       icon={TrendingUp}
@@ -366,10 +366,11 @@ export function DashboardPage({
     <StatCard icon={Bell} tone={ALERT_AMBER} hud className="flex-1" label="Inquiries" onClick={() => setKpiDetail('inquiries')} value={monthInquiries.length} sub={`${newInquiries.length} awaiting reply`} />
   )
   // Borderless map: no panel, no title — the map itself is the hero and the
-  // legend carries the context.
+  // legend carries the context. In the band it fills the column height, so it
+  // absorbs the spare space above it instead of leaving a dead gap.
   const mapBand = (
-    <div className="min-w-0">
-      <SupplierMap suppliers={data.suppliers} height={180} />
+    <div className="flex min-w-0 flex-1 flex-col">
+      <SupplierMap suppliers={data.suppliers} fill />
       <MapLegend />
     </div>
   )
@@ -447,7 +448,7 @@ export function DashboardPage({
           {kpiCash}
           {kpiOrders}
         </div>
-        <div className="flex min-w-0 flex-col justify-center gap-4 xl:col-span-4">
+        <div className="flex min-w-0 flex-col gap-4 xl:col-span-4">
           {mapBand}
         </div>
         <div className="flex min-w-0 flex-col gap-4 xl:col-span-4">

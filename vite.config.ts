@@ -11,6 +11,9 @@ export default defineConfig({
         // an app change doesn't re-download them, and the entry stays small.
         manualChunks(id) {
           if (!id.includes('node_modules')) return undefined
+          // jspdf stays out of the eager vendor chunk: it loads only when a
+          // user actually downloads an invoice or receipt (~120KB gzipped).
+          if (id.includes('jspdf')) return undefined
           if (id.includes('recharts') || id.includes('d3-')) return 'charts'
           if (id.includes('leaflet')) return 'map'
           if (id.includes('react-router')) return 'router'

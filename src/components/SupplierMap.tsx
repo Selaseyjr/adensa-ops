@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import * as L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { CATEGORY_COLORS } from '../lib/colors'
@@ -18,15 +18,27 @@ import { CATEGORY_LABELS, type Supplier } from '../types'
 export function SupplierMap({
   suppliers,
   height = 360,
+  fill = false,
 }: {
   suppliers: Supplier[]
   height?: number
+  /**
+   * Size to the parent box (flex-1) instead of a fixed pixel height — for
+   * layouts where the map should absorb the column's spare height. Leaflet
+   * must be told when that box changes, hence the ResizeObserver below.
+   */
+  fill?: boolean
 }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<L.Map | null>(null)
   const layerRef = useRef<L.LayerGroup | null>(null)
+  // Bumped every time a Leaflet instance is created. The marker effect
+  // depends on it so markers are re-drawn onto the *current* map — without
+  // it, a recreated map (StrictMode remount, HMR, breakpoint swap) would be
+  // left empty because `suppliers` never changed.
+  const [mapEpoch, setMapEpoch] = useState(0)
 
-  // Create the map once.
+  // Create the map once per mount.
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return
 
@@ -45,15 +57,25 @@ export function SupplierMap({
 
     layerRef.current = L.layerGroup().addTo(map)
     mapRef.current = map
+    setMapEpoch((n) => n + 1)
+
+    // Fill mode: the container is sized by CSS (flex-1), so watch the box and
+    // tell Leaflet whenever it actually changes size (resize, sidebar toggle).
+    const observer =
+      fill && typeof ResizeObserver !== 'undefined'
+        ? new ResizeObserver(() => map.invalidateSize({ animate: false }))
+        : null
+    if (observer && containerRef.current) observer.observe(containerRef.current)
 
     return () => {
+      observer?.disconnect()
       map.remove()
       mapRef.current = null
       layerRef.current = null
     }
-  }, [])
+  }, [fill])
 
-  // Redraw markers when the supplier set changes.
+  // Redraw markers when the supplier set changes or the map is (re)created.
   useEffect(() => {
     const layer = layerRef.current
     const map = mapRef.current
@@ -94,13 +116,13 @@ export function SupplierMap({
       const bounds = L.latLngBounds(points)
       map.fitBounds(bounds.pad(0.25), { maxZoom: 11, animate: false })
     }
-  }, [suppliers])
+  }, [suppliers, mapEpoch])
 
   return (
     <div
       ref={containerRef}
-      style={{ height }}
-      className="overflow-hidden rounded-xl border border-line"
+      style={fill ? undefined : { height }}
+      className={`overflow-hidden rounded-xl border border-line${fill ? ' min-h-0 flex-1' : ''}`}
       role="img"
       aria-label="Map of supplier locations across Ghana"
     />
