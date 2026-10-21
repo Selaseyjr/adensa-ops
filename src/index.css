@@ -10,146 +10,171 @@
   --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
 
   /* ============================================================
-     60-30-10 colour system.
-     60% neutral surfaces: canvas, surface, subtle, track.
-     30% structure: ink text, lines, brand chrome.
-     10% accent/status: gold + alert amber/rose (used sparingly).
-     Every text token below is checked against the surface it sits
-     on (>= 4.5:1 for body, >= 3:1 for large/faint labels) in BOTH
+     60-30-10 colour system — orange & black identity.
+     60% neutral surfaces: warm-white page, white surfaces, tone
+     (not borders) carries the separation.
+     30% structure: near-black text, quiet hairlines, a black
+     rail with orange accents — never navy, never violet.
+     10% accent/status: confident orange for primary actions and
+     key highlights only; teal success, amber warning, rose
+     error and ADENSA gold for money stay distinct — the console
+     is never all-orange.
+     Every text token is checked against the surface it sits on
+     (>= 4.5:1 for body, >= 3:1 for large/graphical) in BOTH
      themes. Light mode values are the reference; the .dark block
      re-tunes each one so nothing blends into the background.
      ============================================================ */
 
-  /* ---- 60%: neutral surfaces (light) ---- */
-  --color-canvas: #eaf1fb;   /* day command centre: cool steel daylight */
+  /* ---- 60%: neutral surfaces (light) — warm white ---- */
+  --color-canvas: #fafaf9;   /* page: warm white */
   --color-surface: #ffffff;
-  --color-subtle: #f6f9fd;
-  --color-track: #e3ecf8;
+  --color-subtle: #f5f5f4;
+  --color-track: #e7e5e4;
 
-  /* ---- 30%: structure + text (light) ---- */
-  --color-ink: #12224a;        /* 14.6:1 on surface */
-  --color-ink-soft: #41526f;   /* 8.2:1 on surface */
-  --color-ink-faint: #5b6b8c;  /* 5.6:1 on surface — was #7787a3 (4.1:1, too faint) */
-  --color-line: #d3e2f5;
-  --color-line-strong: #aec5e8;
+  /* ---- 30%: structure + text (light) — near-black ---- */
+  --color-ink: #171717;        /* 17:1 on surface */
+  --color-ink-soft: #525252;   /* 7.4:1 on surface */
+  --color-ink-faint: #6b6b6b;  /* 5.3:1 on surface, 4.9:1 on subtle */
+  --color-line: #eceae7;       /* quiet hairline — tone over borders */
+  --color-line-strong: #d6d3d1;
 
-  /* ---- Brand blues: one family, wide, visible steps ---- */
-  --color-brand-50: #eff6ff;
-  --color-brand-100: #dbeafe;
-  --color-brand-200: #bfdbfe;
-  --color-brand-300: #93c5fd;
-  --color-brand-400: #60a5fa;
-  --color-brand-500: #3b82f6;
-  --color-brand-600: #2563eb;
-  --color-brand-700: #1d4ed8;
-  --color-brand-800: #1e40af;
-  --color-brand-900: #1e3a8a;
-  --color-brand-950: #172554;
+  /* ---- Brand orange: confident, modern — one family, visible steps ---- */
+  --color-brand-50: #fff7ed;
+  --color-brand-100: #ffedd5;
+  --color-brand-200: #fed7aa;
+  --color-brand-300: #fdba74;
+  --color-brand-400: #fb923c;
+  --color-brand-500: #f97316;   /* the primary accent: fills, key highlights */
+  --color-brand-600: #c2410c;   /* primary buttons under white text: 5.2:1 */
+  --color-brand-700: #a83a10;   /* button hover (white text: 6.4:1) */
+  --color-brand-800: #8f2f0e;   /* orange TEXT on light surfaces: 8.5:1 */
+  --color-brand-900: #7c2d12;
+  --color-brand-950: #431407;
+
+  /* ---- Black rail: the sidebar is near-black in BOTH themes
+          with orange accents. Text pairs checked (>= 8:1). ---- */
+  --color-rail: #171717;
+  --color-rail-soft: #262626;
+  --color-rail-line: #2e2e2e;
+  --color-rail-ink: #fafaf9;     /* 15.3:1 on rail */
+  --color-rail-ink-soft: #a3a3a3; /* 8.4:1 on rail */
 
   /* ---- 10%: accent + status (light) ---- */
-  --color-gold-400: #c9a227;   /* brand gold — accents, focus, highlights */
+  --color-gold-400: #c9a227;   /* ADENSA gold — money, mark, highlights */
   --color-gold-500: #b8941f;
   --color-gold-600: #8a6408;   /* deep gold: 5.4:1 on surface, 4.7:1 on canvas */
   --color-gold-soft: #f7efd6;
-  --color-alert-amber: #b45309;  /* darker than #d97706: 4.9:1 on surface */
-  --color-alert-rose: #be123c;   /* 6.3:1 on surface */
-  --color-success: #1d4ed8;
+  --color-alert-amber: #b45309;  /* 4.9:1 on surface — warning */
+  --color-alert-rose: #be123c;   /* 6.3:1 on surface — error */
+  --color-success: #0f766e;      /* teal (5.5:1 on surface) — done / delivered */
 
   /* ---- HUD command-centre accents (Phase 1 palette) ---- */
   --color-hud-accent: #8a6408;  /* gold trim, day: 5.4:1 on surface */
-  --color-panel-edge: #cfe0f7; /* panel hairline — chrome lands in Phase 2 */
-  --color-texture-dot: rgba(18, 34, 74, 0.05);
-  --color-chart-grid: #d3e2f5;  /* chart grid lines, day (matches line) */
+  --color-panel-edge: #d6d3d1; /* quiet panel hairline */
+  --color-texture-dot: rgba(23, 23, 23, 0.05);
+  --color-chart-grid: #e7e5e4;  /* chart grid lines, day (matches track) */
 
-  /* ---- Semantic category / status / type scales (10% accents) ---- */
-  --color-stage-draft: #93c5fd;
-  --color-stage-quoted: #60a5fa;
-  --color-stage-deposit: #3b82f6;
-  --color-stage-ordered: #2563eb;
-  --color-stage-delivered: #1d4ed8;
+  /* ---- Semantic category / status / type scales (10% accents).
+          Deliberately MIXED earthy hues — stone, amber, orange,
+          teal and olive — so no single colour dominates and every
+          series stays distinguishable in both themes. Orange is a
+          highlight, never the whole chart. ---- */
+  --color-stage-draft: #78716c;
+  --color-stage-quoted: #d97706;
+  --color-stage-deposit: #ea580c;
+  --color-stage-ordered: #9a3412;
+  --color-stage-delivered: #0f766e;
   --color-stage-settled: #9c7d12;  /* gold: the money has landed */
-  --color-cat-cement: #1e3a8a;
-  --color-cat-plumbing: #2563eb;
-  --color-cat-electrical: #b8860b;
-  --color-cat-safety: #93c5fd;
-  --color-cat-tools: #8a6408;
-  --color-status-identified: #93c5fd;
-  --color-status-contacted: #3b82f6;
-  --color-status-vetted: #8a6408;  /* gold: qualified */
-  --color-ctype-contractor: #1e3a8a;
-  --color-ctype-plumber: #2563eb;
-  --color-ctype-electrician: #b8860b;
-  --color-ctype-business: #1d4ed8;
-  --color-ctype-individual: #93c5fd;
-  --color-ctype-institution: #8a6408;
+  --color-cat-cement: #44403c;
+  --color-cat-plumbing: #c2410c;
+  --color-cat-electrical: #a16207;
+  --color-cat-safety: #0f766e;
+  --color-cat-tools: #4d7c0f;
+  --color-status-identified: #57534e;
+  --color-status-contacted: #c2410c;
+  --color-status-vetted: #0f766e;  /* teal: qualified */
+  --color-ctype-contractor: #292524;
+  --color-ctype-plumber: #ea580c;
+  --color-ctype-electrician: #d97706;
+  --color-ctype-business: #0f766e;
+  --color-ctype-individual: #78716c;
+  --color-ctype-institution: #4d7c0f;
 }
 
 /* Unlayered rules beat Tailwind's @layer theme — .dark always wins.
    Dark mode re-tunes BOTH surfaces (lighter, separated) and text
    (brighter) so the deep blues never blend into the background. */
 .dark {
-  /* ---- 60%: neutral surfaces, lifted apart for depth ---- */
-  --color-canvas: #070f1f;      /* page: deep space navy */
-  --color-surface: #14213c;     /* cards: clearly above canvas (3.2:1 vs canvas) */
-  --color-subtle: #1a2a4a;      /* wells/inputs: above surface */
-  --color-track: #243657;       /* bars/wells: visible on subtle */
+  /* ---- 60%: neutral surfaces — near-black page, charcoal surfaces ---- */
+  --color-canvas: #111111;      /* page: near-black */
+  --color-surface: #1a1a1a;     /* main surfaces */
+  --color-subtle: #242424;      /* elevated surfaces / wells */
+  --color-track: #333333;       /* bars/wells: visible on subtle */
 
   /* ---- 30%: structure + text, all brightened ---- */
-  --color-ink: #f2f6ff;         /* 15.8:1 on surface */
-  --color-ink-soft: #c3d1ec;    /* 9.4:1 on surface — was #b3c1da */
-  --color-ink-faint: #8fa3c8;   /* 5.4:1 on surface — was #7a8aa8 (3.4:1, too dim) */
-  --color-line: #274366;        /* borders read on surface (cyan-tinted) */
-  --color-line-strong: #3f5d8c;
+  --color-ink: #fafaf9;         /* 16:1 on surface */
+  --color-ink-soft: #a3a3a3;    /* 6.9:1 on surface */
+  --color-ink-faint: #949494;   /* 5.7:1 on surface, 5.1:1 on subtle */
+  --color-line: #2e2e2e;        /* quiet hairline on charcoal */
+  --color-line-strong: #404040;
 
-  /* ---- Brand blues retuned upward so chrome stays visible ---- */
-  --color-brand-50: #172554;
-  --color-brand-100: #dbeafe;   /* sidebar body text on brand-950: 13.9:1 */
-  --color-brand-200: #bfdbfe;   /* sidebar nav items: 11.6:1 */
-  --color-brand-300: #93c5fd;
-  --color-brand-400: #7db3ff;   /* links on surface: 6.4:1 */
-  --color-brand-500: #60a5fa;
-  --color-brand-600: #2563eb;   /* button bg under white text: 5.2:1 */
-  --color-brand-700: #1d4ed8;   /* button hover: 6.9:1 under white */
-  --color-brand-800: #1e40af;
-  --color-brand-900: #1e3a8a;
-  --color-brand-950: #0e1b33;   /* sidebar: between canvas and surface */
+  /* ---- Brand orange at night: #fb923c / #fdba74 are the dark-mode
+          accent + hover tones; buttons keep #ea580c under white (4.8:1). ---- */
+  --color-brand-50: #431407;
+  --color-brand-100: #ffedd5;
+  --color-brand-200: #fed7aa;
+  --color-brand-300: #fdba74;   /* strong accent / hover tone at night */
+  --color-brand-400: #fb923c;   /* links + accents on surface: 8.7:1 */
+  --color-brand-500: #f97316;
+  --color-brand-600: #c2410c;   /* button bg under white text: 5.2:1 */
+  --color-brand-700: #a83a10;   /* button hover: 6.4:1 under white */
+  --color-brand-800: #8f2f0e;
+  --color-brand-900: #7c2d12;
+  --color-brand-950: #431407;
+
+  /* ---- Black rail deepens a step at night ---- */
+  --color-rail: #0d0d0d;
+  --color-rail-soft: #1f1f1f;
+  --color-rail-line: #262626;
+  --color-rail-ink: #fafaf9;     /* 16.4:1 on rail */
+  --color-rail-ink-soft: #a3a3a3; /* 9.1:1 on rail */
 
   /* ---- 10%: accent + status, brightened for dark ---- */
-  --color-gold-400: #f0c75e;    /* gold glows on dark (warmer, toward photo amber) */
+  --color-gold-400: #f0c75e;    /* gold glows on dark */
   --color-gold-500: #d9ad33;
   --color-gold-600: #e6c255;
   --color-gold-soft: #2e2a16;
-  --color-alert-amber: #fbbf24; /* amber-300: 9.6:1 on surface */
-  --color-alert-rose: #fb7185;  /* rose-400: 7.1:1 on surface */
-  --color-success: #7db3ff;
+  --color-alert-amber: #fbbf24; /* 9.6:1 on surface */
+  --color-alert-rose: #fb7185;  /* 7.1:1 on surface */
+  --color-success: #2dd4bf;     /* teal glows on dark */
 
   /* ---- HUD command-centre accents (Phase 1 palette) ---- */
-  --color-hud-accent: #f0c75e;  /* gold trim, night: glows at 9.9:1 on surface */
-  --color-panel-edge: #2f4f86;  /* panel hairline — chrome lands in Phase 2 */
-  --color-texture-dot: rgba(125, 179, 255, 0.07);
-  --color-chart-grid: #2f4a7a;  /* brighter than line so graphs read on dark */
+  --color-hud-accent: #f0c75e;  /* gold trim, night */
+  --color-panel-edge: #404040;  /* charcoal panel hairline */
+  --color-texture-dot: rgba(250, 250, 249, 0.05);
+  --color-chart-grid: #3a3a3a;  /* brighter than line so graphs read on dark */
 
   /* Scales lifted for dark: same order, all readable on surface. */
-  --color-stage-draft: #bfdbfe;
-  --color-stage-quoted: #93c5fd;
-  --color-stage-deposit: #7db3ff;
-  --color-stage-ordered: #60a5fa;
-  --color-stage-delivered: #3b82f6;
+  --color-stage-draft: #a8a29e;
+  --color-stage-quoted: #fbbf24;
+  --color-stage-deposit: #fb923c;
+  --color-stage-ordered: #ea580c;
+  --color-stage-delivered: #2dd4bf;
   --color-stage-settled: #f0c75e;  /* gold: the money has landed */
-  --color-cat-cement: #93b4ff;
-  --color-cat-plumbing: #60a5fa;
-  --color-cat-electrical: #f0c75e;
-  --color-cat-safety: #bfdbfe;
-  --color-cat-tools: #d9ad33;
-  --color-status-identified: #bfdbfe;
-  --color-status-contacted: #60a5fa;
-  --color-status-vetted: #f0c75e;  /* gold: qualified */
-  --color-ctype-contractor: #93b4ff;
-  --color-ctype-plumber: #60a5fa;
-  --color-ctype-electrician: #f0c75e;
-  --color-ctype-business: #7db3ff;
-  --color-ctype-individual: #bfdbfe;
-  --color-ctype-institution: #d9ad33;
+  --color-cat-cement: #a8a29e;
+  --color-cat-plumbing: #fb923c;
+  --color-cat-electrical: #fbbf24;
+  --color-cat-safety: #2dd4bf;
+  --color-cat-tools: #a3e635;
+  --color-status-identified: #a8a29e;
+  --color-status-contacted: #fb923c;
+  --color-status-vetted: #2dd4bf;  /* teal: qualified */
+  --color-ctype-contractor: #d6d3d1;
+  --color-ctype-plumber: #fb923c;
+  --color-ctype-electrician: #fbbf24;
+  --color-ctype-business: #2dd4bf;
+  --color-ctype-individual: #a8a29e;
+  --color-ctype-institution: #a3e635;
 }
 
 html,
@@ -177,18 +202,8 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* ---- Phase 1 canvas: command-centre texture, dark mode only ----
-   A soft top glow plus a faint dot grid, both fully static (no
-   animation budget, easy on the eyes at 3am). Light mode stays a
-   calm steel daylight with no texture. */
-.dark body {
-  background-image:
-    radial-gradient(1100px 620px at 50% -8%, rgba(37, 99, 235, 0.16), transparent 62%),
-    radial-gradient(circle, var(--color-texture-dot) 1px, transparent 1.5px);
-  background-size:
-    100% 620px,
-    26px 26px;
-}
+/* ---- Dark canvas stays a plain near-black: no decorative gradients,
+   no dot texture — calm and data-focused in both themes. */
 
 /* Display face: headings and hero numbers. */
 h1, h2, h3 {
@@ -253,7 +268,7 @@ h1, h2, h3 {
 }
 
 .dark .leaflet-control-attribution {
-  background: rgba(11, 20, 36, 0.88);
+  background: rgba(17, 17, 17, 0.88);
   color: var(--color-ink-faint);
 }
 
@@ -472,4 +487,105 @@ html.theme-crossfading *::after {
   .hud-panel > header h3::before {
     content: none;
   }
+}
+
+/* ---- /welcome: Glacier exhibition hero (pure CSS motion) ----
+   Entrance choreography mirrors the template's original timing
+   (0.7-0.85s, easeOut, delays 0.1-0.8s); the glows drift on slow
+   GPU transforms instead of the stock video. Everything parks
+   under prefers-reduced-motion. Scoped to the welcome route. */
+.w-fade-up,
+.w-fade-up-lg,
+.w-fade-in {
+  animation-timing-function: cubic-bezier(0.33, 1, 0.68, 1);
+  animation-fill-mode: backwards; /* hold hidden until the delay elapses */
+}
+.w-fade-up { animation-name: w-rise; }
+.w-fade-up-lg { animation-name: w-rise-lg; }
+.w-fade-in { animation-name: w-fade; }
+
+@keyframes w-rise {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes w-rise-lg {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes w-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Background drift — two slow, opposed glows (26s/34s, never in sync). */
+.w-glow-a { animation: w-drift-a 26s ease-in-out infinite alternate; }
+.w-glow-b { animation: w-drift-b 34s ease-in-out infinite alternate; }
+
+@keyframes w-drift-a {
+  from { transform: translate(-3%, -2%) scale(1); }
+  to { transform: translate(3%, 3%) scale(1.08); }
+}
+@keyframes w-drift-b {
+  from { transform: translate(2%, 3%) scale(1.06); }
+  to { transform: translate(-3%, -2%) scale(0.98); }
+}
+
+/* Ellipse CTA: hover wash + press feedback, gold focus ring. */
+.w-cta {
+  transition: background-color 0.25s ease, border-color 0.25s ease, transform 0.12s ease;
+}
+.w-cta:hover { background-color: rgba(245, 239, 230, 0.12); border-color: rgba(245, 239, 230, 0.85); }
+.w-cta:active { transform: scale(0.97); }
+.w-cta:focus-visible {
+  outline: 2px solid #c9a227;
+  outline-offset: 4px;
+}
+
+/* Footer bar on narrow screens: one centred line (scope + icon).
+   !important on the centre label because it carries an inline display. */
+@media (max-width: 720px) {
+  .w-footer { padding: 0 18px 18px; justify-content: center; }
+  .w-footer-center { display: none !important; }
+  .w-footer-legal { display: none; }
+  .w-footer-scope { font-size: 9px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .w-fade-up,
+  .w-fade-up-lg,
+  .w-fade-in,
+  .w-glow-a,
+  .w-glow-b {
+    animation: none;
+  }
+  .w-cta:active { transform: none; }
+}
+
+/* ---- shadcn/ui token bridge ----
+   Maps shadcn's standard utility names (bg-background, text-muted-foreground,
+   border-border, ...) onto the existing AdensaOps tokens so copied shadcn
+   primitives render in the house style with zero restyling. `inline` means
+   the utilities resolve the referenced token at use time, so the .dark
+   overrides above flow through automatically. No new colors are introduced;
+   future `npx shadcn add` components inherit this palette by default. */
+@theme inline {
+  --color-background: var(--color-canvas);
+  --color-foreground: var(--color-ink);
+  --color-card: var(--color-surface);
+  --color-card-foreground: var(--color-ink);
+  --color-popover: var(--color-surface);
+  --color-popover-foreground: var(--color-ink);
+  --color-primary: var(--color-brand-600);
+  --color-primary-foreground: #ffffff;
+  --color-secondary: var(--color-subtle);
+  --color-secondary-foreground: var(--color-ink);
+  --color-muted: var(--color-subtle);
+  --color-muted-foreground: var(--color-ink-faint);
+  --color-accent: var(--color-track);
+  --color-accent-foreground: var(--color-ink);
+  --color-destructive: var(--color-alert-rose);
+  --color-destructive-foreground: #ffffff;
+  --color-border: var(--color-line);
+  --color-input: var(--color-line-strong);
+  --color-ring: var(--color-brand-300);
 }

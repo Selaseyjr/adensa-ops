@@ -35,7 +35,7 @@ export function ChartCard({
 }) {
   return (
     <section
-      className={`min-w-0 rounded-xl border border-line bg-surface p-5 shadow-sm ${hud ? 'hud-panel' : ''} ${className}`}
+      className={`min-w-0 rounded-2xl border border-line bg-surface p-5 shadow-sm ${hud ? 'hud-panel' : ''} ${className}`}
     >
       <header className="flex items-start justify-between gap-3">
         <div className="min-w-0">
@@ -158,7 +158,7 @@ export function CategoryBars({ data, height = 190 }: { data: BarDatum[]; height?
           />
           <Tooltip
             contentStyle={CHART_TOOLTIP_STYLE}
-            cursor={{ fill: 'rgba(96, 165, 250, 0.12)' }}
+            cursor={{ fill: 'rgba(124, 58, 237, 0.10)' }}
             formatter={(value) => [`${value} supplier${Number(value) === 1 ? '' : 's'}`, 'Count']}
           />
           <Bar dataKey="value" radius={[6, 6, 0, 0]} maxBarSize={48}>

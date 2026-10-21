@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ADENSA — Invoice (print master)</title>
+<style>
+  /* ── Print setup: exactly one A4, no browser margins ── */
+  @page { size: A4; margin: 0; }
+
+  @font-face {
+    font-family: 'Poppins';
+    font-weight: 600;
+    src: url('../node_modules/@fontsource/poppins/files/poppins-latin-600-normal.woff2') format('woff2');
+    font-display: swap;
+  }
+  @font-face {
+    font-family: 'Poppins';
+    font-weight: 700;
+    src: url('../node_modules/@fontsource/poppins/files/poppins-latin-700-normal.woff2') format('woff2');
+    font-display: swap;
+  }
+  @font-face {
+    font-family: 'Poppins';
+    font-weight: 800;
+    src: url('../node_modules/@fontsource/poppins/files/poppins-latin-800-normal.woff2') format('woff2');
+    font-display: swap;
+  }
+
+  :root {
+    --night: #0B1B2B;   /* Adensa Night  */
+    --gold:  #C9A227;   /* Dawn Gold     */
+    --ink:   #222B33;   /* body ink      */
+    --line:  #8d97a4;   /* writing lines */
+    --faint: #d4d9e0;   /* table rules   */
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Poppins', 'Segoe UI', Arial, sans-serif;
+    color: var(--ink);
+    background: #e9ecef;               /* screen only */
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .page {
+    width: 210mm;
+    height: 297mm;
+    padding: 9mm 13mm 7mm;
+    margin: 10mm auto;
+    background: #fff;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;                 /* guarantee a single page */
+  }
+
+  @media print {
+    body { background: none; }
+    .page { margin: 0; box-shadow: none; }
+  }
+  @media screen {
+    .page { box-shadow: 0 2px 14px rgba(11, 27, 43, .25); }
+  }
+
+  /* ── Header ─────────────────────────────────────────── */
+  .head { display: flex; align-items: flex-start; justify-content: space-between; }
+  .logo { width: 54mm; height: auto; display: block; }
+
+  .doc-title {
+    text-align: right;
+    font-size: 34pt;
+    font-weight: 800;
+    letter-spacing: .10em;
+    color: var(--night);
+    line-height: .95;
+    margin: 0;
+  }
+  .doc-sub {
+    text-align: right;
+    font-size: 8pt;
+    font-weight: 700;
+    letter-spacing: .34em;
+    color: var(--gold);
+    text-transform: uppercase;
+    margin-top: 1.5mm;
+  }
+
+  .legal {
+    margin-top: 3.5mm;
+    font-size: 8.5pt;
+    font-weight: 700;
+    color: var(--night);
+    letter-spacing: .02em;
+  }
+  .legal .sep { color: var(--gold); padding: 0 1.6mm; }
+
+  /* header fill-in contact line */
+  .contact-line {
+    display: flex;
+    gap: 6mm;
+    margin-top: 2mm;
+    font-size: 8pt;
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .contact-line .fill { flex: 1; display: flex; align-items: baseline; }
+  .contact-line .fill b { font-weight: 700; color: var(--night); white-space: nowrap; margin-right: 1.5mm; }
+  .dots {
+    flex: 1;
+    border-bottom: .35mm solid var(--line);
+    height: 5.2mm;                    /* writing room */
+  }
+
+  .rule-gold { border: 0; border-top: .6mm solid var(--gold); margin: 3mm 0 0; }
+
+  /* ── Invoice details strip ──────────────────────────── */
+  .details {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 4mm;
+    margin-top: 3.5mm;
+  }
+  .field {
+    border: .45mm solid var(--night);
+    border-radius: 1.2mm;
+    height: 13mm;
+    padding: 1.2mm 2.2mm 0;
+  }
+  .field .lab {
+    font-size: 6.8pt;
+    font-weight: 800;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--night);
+    display: block;
+  }
+
+  /* ── Bill to / deliver to ───────────────────────────── */
+  .parties { display: grid; grid-template-columns: 1fr 1fr; gap: 5mm; margin-top: 4mm; }
+  .party {
+    border: .45mm solid var(--night);
+    border-radius: 1.5mm;
+    padding: 2.5mm 3.5mm 2mm;
+  }
+  .party h2 {
+    margin: 0 0 1mm;
+    font-size: 8.5pt;
+    font-weight: 800;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--night);
+    display: flex;
+    align-items: center;
+    gap: 2mm;
+  }
+  .party h2::after { content: ""; flex: 1; border-top: .5mm solid var(--gold); }
+  .party .lbl {
+    font-size: 7.5pt;
+    font-weight: 700;
+    color: var(--night);
+    margin-top: 1.6mm;
+  }
+  .party .write {
+    border-bottom: .35mm solid var(--line);
+    height: 7mm;                      /* comfortable handwriting line */
+  }
+
+  /* ── Items table ────────────────────────────────────── */
+  table.items {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 4mm;
+    table-layout: fixed;
+  }
+  table.items thead th {
+    background: var(--night);
+    color: #fff;
+    font-size: 8pt;
+    font-weight: 800;
+    letter-spacing: .10em;
+    text-transform: uppercase;
+    padding: 2.4mm 2mm;
+    border: .3mm solid var(--night);
+  }
+  table.items tbody td {
+    border: .3mm solid var(--faint);
+    height: 10mm;                     /* one line of handwriting per row */
+  }
+  table.items .num {
+    text-align: center;
+    font-weight: 800;
+    color: var(--night);
+    font-size: 10pt;
+    width: 9mm;
+  }
+  table.items th.c-qty, table.items td.c-qty   { width: 14mm; text-align: center; }
+  table.items th.c-unit, table.items td.c-unit { width: 18mm; text-align: center; }
+  table.items th.c-price, table.items td.c-price { width: 34mm; }
+  table.items th.c-amt, table.items td.c-amt   { width: 38mm; }
+  table.items th.c-desc, table.items td.c-desc { width: auto; }
+
+  /* ── Payment + totals ───────────────────────────────── */
+  .money-row {
+    display: grid;
+    grid-template-columns: 1fr 84mm;
+    gap: 5mm;
+    margin-top: 4mm;
+  }
+
+  .pay {
+    border: .45mm solid var(--night);
+    border-radius: 1.5mm;
+    padding: 2.5mm 3.5mm 2mm;
+    height: fit-content;
+  }
+  .pay h2 {
+    margin: 0 0 1mm;
+    font-size: 8.5pt;
+    font-weight: 800;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--night);
+    display: flex;
+    align-items: center;
+    gap: 2mm;
+  }
+  .pay h2::after { content: ""; flex: 1; border-top: .5mm solid var(--gold); }
+  .pay .lbl { font-size: 7.5pt; font-weight: 700; color: var(--night); margin-top: 1.6mm; }
+  .pay .write { border-bottom: .35mm solid var(--line); height: 7.6mm; }
+  .pay .hint { font-size: 7pt; font-weight: 600; color: #5b6774; margin-top: 1.2mm; }
+
+  .totals {
+    border: .6mm solid var(--night);
+    border-radius: 1.5mm;
+    overflow: hidden;
+  }
+  .totals .t-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 1.4mm 3.5mm;
+    border-bottom: .3mm solid var(--faint);
+    font-size: 8.5pt;
+    font-weight: 700;
+    color: var(--night);
+  }
+  .totals .t-row .val {
+    width: 34mm;
+    border-bottom: .35mm solid var(--line);
+    height: 5.6mm;
+    flex: none;
+  }
+  .totals .t-note {
+    padding: 1.5mm 3.5mm;
+    font-size: 6.8pt;
+    font-weight: 600;
+    color: #5b6774;
+    border-bottom: .3mm solid var(--faint);
+  }
+  .totals .t-big {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.9mm 3.5mm;
+    background: var(--night);
+    color: #fff;
+    font-size: 12pt;
+    font-weight: 800;
+    letter-spacing: .04em;
+  }
+  .totals .t-big .val { width: 36mm; border-bottom: .45mm solid #fff; height: 7mm; flex: none; }
+  .totals .t-balance {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.9mm 3.5mm;
+    background: #FBF4DF;
+    border-top: .6mm solid var(--gold);
+    color: var(--night);
+    font-size: 11pt;
+    font-weight: 800;
+  }
+  .totals .t-balance .val { width: 36mm; border-bottom: .45mm solid var(--night); height: 7mm; flex: none; }
+
+  /* ── Terms + signature ──────────────────────────────── */
+  .terms {
+    margin-top: 4mm;
+    font-size: 7.3pt;
+    font-weight: 600;
+    line-height: 1.5;
+    color: var(--ink);
+  }
+  .terms h3 {
+    display: inline;
+    font-size: 7.6pt;
+    font-weight: 800;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--night);
+    margin-right: 1.5mm;
+  }
+
+  .sign { display: flex; gap: 5mm; margin-top: auto; padding-top: 3.5mm; align-items: flex-end; }
+  .sign .prep { flex: 1; }
+  .sign .lbl { font-size: 7.5pt; font-weight: 700; color: var(--night); }
+  .sign .write { border-bottom: .35mm solid var(--line); height: 8mm; }
+  .sign .stamp {
+    width: 52mm;
+    height: 22mm;
+    border: .45mm dashed var(--line);
+    border-radius: 1.5mm;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 7pt;
+    font-weight: 700;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: #7b8695;
+  }
+
+  .foot {
+    margin-top: 3mm;
+    padding-top: 2mm;
+    border-top: .5mm solid var(--gold);
+    display: flex;
+    justify-content: space-between;
+    font-size: 7pt;
+    font-weight: 700;
+    color: var(--night);
+    letter-spacing: .06em;
+  }
+  .foot .tag { color: var(--gold); }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ── Company header: logo + name at the top ── -->
+  <header class="head">
+    <svg class="logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 410 150" role="img" aria-label="ADENSA — Supply &amp; Logistics">
+      <title>ADENSA — Horizontal lockup (Day)</title>
+      <g transform="translate(-25.125,-5) scale(0.3125)">
+        <rect fill="#C9A227" x="198" y="110" width="116" height="68" rx="8"/>
+        <rect fill="#0B1B2B" x="152" y="222" width="208" height="68" rx="8"/>
+        <rect fill="#0B1B2B" x="106" y="334" width="300" height="68" rx="8"/>
+      </g>
+      <text x="128" y="78" font-family="Poppins, Montserrat, 'Segoe UI', Arial, sans-serif" font-weight="700" font-size="54" letter-spacing="4.5" fill="#0B1B2B">ADENSA</text>
+      <text x="129" y="110" font-family="Poppins, Montserrat, 'Segoe UI', Arial, sans-serif" font-weight="600" font-size="14" letter-spacing="5.6" fill="#C9A227">SUPPLY &amp; LOGISTICS</text>
+    </svg>
+
+    <div>
+      <p class="doc-title">INVOICE</p>
+      <p class="doc-sub">Original &middot; Customer copy</p>
+    </div>
+  </header>
+
+  <p class="legal">
+    ADENSA SUPPLY &amp; LOGISTICS LTD.
+    <span class="sep">&#9670;</span> Reg. No. CS208781026
+    <span class="sep">&#9670;</span> TIN: C0068016212
+  </p>
+
+  <div class="contact-line">
+    <span class="fill"><b>Phone&nbsp;/&nbsp;WhatsApp:</b><span class="dots"></span></span>
+    <span class="fill"><b>Email:</b><span class="dots"></span></span>
+    <span class="fill"><b>Address:</b><span class="dots"></span></span>
+  </div>
+
+  <hr class="rule-gold">
+
+  <!-- ── Invoice number, dates ── -->
+  <section class="details">
+    <div class="field"><span class="lab">Invoice No.</span></div>
+    <div class="field"><span class="lab">Date</span></div>
+    <div class="field"><span class="lab">Order / Proforma No.</span></div>
+    <div class="field"><span class="lab">Due Date</span></div>
+  </section>
+
+  <!-- ── Who pays, where it goes ── -->
+  <section class="parties">
+    <div class="party">
+      <h2>Bill to</h2>
+      <div class="lbl">Customer / company name</div>
+      <div class="write"></div>
+      <div class="lbl">Contact person &amp; phone</div>
+      <div class="write"></div>
+    </div>
+    <div class="party">
+      <h2>Deliver to</h2>
+      <div class="lbl">Site / company name</div>
+      <div class="write"></div>
+      <div class="lbl">Location / landmark</div>
+      <div class="write"></div>
+    </div>
+  </section>
+
+  <!-- ── Items ── -->
+  <table class="items">
+    <thead>
+      <tr>
+        <th class="c-num">#</th>
+        <th class="c-desc">Description of goods / service</th>
+        <th class="c-qty">Qty</th>
+        <th class="c-unit">Unit</th>
+        <th class="c-price">Unit price (GH&#8373;)</th>
+        <th class="c-amt">Amount (GH&#8373;)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td class="num">1</td><td class="c-desc"></td><td class="c-qty"></td><td class="c-unit"></td><td class="c-price"></td><td class="c-amt"></td></tr>
+      <tr><td class="num">2</td><td class="c-desc"></td><td class="c-qty"></td><td class="c-unit"></td><td class="c-price"></td><td class="c-amt"></td></tr>
+      <tr><td class="num">3</td><td class="c-desc"></td><td class="c-qty"></td><td class="c-unit"></td><td class="c-price"></td><td class="c-amt"></td></tr>
+      <tr><td class="num">4</td><td class="c-desc"></td><td class="c-qty"></td><td class="c-unit"></td><td class="c-price"></td><td class="c-amt"></td></tr>
+      <tr><td class="num">5</td><td class="c-desc"></td><td class="c-qty"></td><td class="c-unit"></td><td class="c-price"></td><td class="c-amt"></td></tr>
+      <tr><td class="num">6</td><td class="c-desc"></td><td class="c-qty"></td><td class="c-unit"></td><td class="c-price"></td><td class="c-amt"></td></tr>
+    </tbody>
+  </table>
+
+  <!-- ── How to pay (left) + money summary (right) ── -->
+  <section class="money-row">
+    <div class="pay">
+      <h2>How to pay</h2>
+      <div class="lbl">MoMo merchant / number</div>
+      <div class="write"></div>
+      <div class="lbl">Bank name &amp; account number</div>
+      <div class="write"></div>
+      <div class="hint">Payment reference: always use the <b>Invoice No.</b> above.</div>
+    </div>
+
+    <div class="totals">
+      <div class="t-row"><span>Subtotal (GH&#8373;)</span><span class="val"></span></div>
+      <div class="t-row"><span>Delivery / transport (GH&#8373;)</span><span class="val"></span></div>
+      <div class="t-note">VAT: not applicable — Adensa is not VAT-registered.</div>
+      <div class="t-big"><span>TOTAL DUE (GH&#8373;)</span><span class="val"></span></div>
+      <div class="t-balance"><span>BALANCE DUE (GH&#8373;)</span><span class="val"></span></div>
+    </div>
+  </section>
+
+  <!-- ── Plain-language terms, both parties can read ── -->
+  <section class="terms">
+    <h3>Terms</h3>
+    70% deposit confirms the order, balance on delivery (established clients with 3+ paid orders: 50% deposit).
+    Goods remain the property of Adensa Supply &amp; Logistics Ltd. until paid in full.
+    Inspect goods on delivery — report shortages or damage within 24 hours.
+    Delivery dates are estimates and depend on supplier availability and transport.
+    Subject to our Standard Terms &amp; Conditions of Supply.
+  </section>
+
+  <!-- ── Sign-off ── -->
+  <section class="sign">
+    <div class="prep">
+      <div class="lbl">Prepared by (name)</div>
+      <div class="write"></div>
+    </div>
+    <div class="prep">
+      <div class="lbl">Customer signature — goods received</div>
+      <div class="write"></div>
+    </div>
+    <div class="stamp">Adensa sign / stamp</div>
+  </section>
+
+  <footer class="foot">
+    <span>ADENSA SUPPLY &amp; LOGISTICS LTD.</span>
+    <span class="tag">YOUR PROJECT, OUR PROCUREMENT</span>
+  </footer>
+
+</div>
+</body>
+</html>

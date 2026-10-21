@@ -50,10 +50,12 @@ const ComparePage = lazy(() => import('./pages/ComparePage').then((m) => ({ defa
 const OrdersPage = lazy(() => import('./pages/OrdersPage').then((m) => ({ default: m.OrdersPage })))
 const CashTrackerPage = lazy(() => import('./pages/CashTrackerPage').then((m) => ({ default: m.CashTrackerPage })))
 const QuoteBuilderPage = lazy(() => import('./quoteBuilder').then((m) => ({ default: m.QuoteBuilderPage })))
+// Public exhibition hero — the only route rendered outside the console shell.
+const WelcomePage = lazy(() => import('./pages/WelcomePage'))
 import { ErrorBoundary, PageSkeleton } from './components/states'
 import { ToastProvider, useToast } from './components/toast'
 import { CommandPalette } from './components/CommandPalette'
-import { useFocusTrap } from './lib/a11y'
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from './components/ui/dialog'
 
 type NavKey = 'dashboard' | 'suppliers' | 'customers' | 'compare' | 'quotes' | 'orders' | 'cash'
 
@@ -105,7 +107,9 @@ function AppInner() {
   const toast = useToast()
   const [paletteOpen, setPaletteOpen] = useState(false)
   const paletteTriggerRef = useRef<HTMLButtonElement>(null)
-  const pinDialogRef = useRef<HTMLDivElement>(null)
+  // Cross-page handoff: the quote builder's View action opens that order's
+  // detail popup on the Orders page (consumed once by OrdersPage).
+  const [pendingOrderId, setPendingOrderId] = useState<string | null>(null)
 
   // PIN gate state
   const [pinOpen, setPinOpen] = useState(false)
@@ -175,10 +179,12 @@ function AppInner() {
     const q = data.quotes.find((x) => x.id === quoteId)
     if (!q) return
     const before = localRecords
-    const confirmStatus = () =>
+    const confirmStatus = (orderId?: string) =>
       toast.success(
         status === 'accepted'
-          ? `Quote ${quoteId} accepted. Order opened.`
+          ? orderId
+            ? `Quote ${quoteId} accepted. Order ${orderId} opened, awaiting approval.`
+            : `Quote ${quoteId} accepted.`
           : `Quote ${quoteId} declined.`,
         { label: 'Undo', onClick: () => commitRecords(before) },
       )
@@ -193,11 +199,11 @@ function AppInner() {
           qty: l.qty,
           unitGhs: l.unitPriceGhs,
         })),
-        stage: 'quoted',
+        stage: 'draft',
         valueGhs: q.valueGhs,
         depositGhs: 0,
         receivedOn: localDate(),
-        notes: `Created from accepted quote ${q.id}.`,
+        notes: `Created from accepted quote ${q.id}. Awaiting manager approval.`,
       }
       commitRecords({
         ...localRecords,
@@ -208,7 +214,7 @@ function AppInner() {
           [quoteId]: { ...prev, status, responseDays: daysSince(q.sentOn), orderIds: [orderId] },
         },
       })
-      confirmStatus()
+      confirmStatus(orderId)
       return
     }
     commitRecords({
@@ -321,7 +327,7 @@ function AppInner() {
     // Slow smooth crossfade: a veil of the incoming canvas colour fades in,
     // the theme swaps underneath it at full cover, then the veil lifts.
     veil.style.transition = 'opacity 450ms ease'
-    veil.style.backgroundColor = next === 'dark' ? '#070f1f' : '#eaf1fb'
+    veil.style.backgroundColor = next === 'dark' ? '#111111' : '#fafaf9'
     veil.style.opacity = '1'
     window.setTimeout(() => {
       applyTheme(next)
@@ -375,9 +381,14 @@ function AppInner() {
     return () => window.clearTimeout(t)
   }, [])
 
-  // Focus trap: keeps Tab inside the PIN dialog, Escape closes it,
-  // focus returns to the control that opened it.
-  useFocusTrap(pinDialogRef, pinOpen, closePin)
+  // The welcome hero is a self-contained poster page: no sidebar, no top bar.
+  if (location.pathname === '/welcome') {
+    return (
+      <Suspense fallback={<PageSkeleton />}>
+        <WelcomePage />
+      </Suspense>
+    )
+  }
 
   if (!pathKnown) return <Navigate to="/" replace />
 
@@ -401,12 +412,14 @@ function AppInner() {
         )}
 
         {/* Sidebar — fixed drawer on mobile, static column from md up */}
+        {/* The rail is charcoal / near-black in BOTH themes — the anchor
+            of the orange identity (near-black rail, orange accents). */}
         <aside
-          className={`fixed inset-y-0 left-0 z-40 flex w-64 shrink-0 flex-col border-r border-line bg-surface text-ink-soft transition-all duration-200 dark:border-brand-900 dark:bg-brand-950 dark:text-brand-100 md:static md:w-60 md:translate-x-0 ${
+          className={`fixed inset-y-0 left-0 z-40 flex w-64 shrink-0 flex-col border-r border-rail-line bg-rail text-rail-ink-soft transition-all duration-200 md:static md:w-60 md:translate-x-0 ${
             navOpen ? 'translate-x-0' : '-translate-x-full'
           }`}
         >
-          <div className="flex items-start justify-between gap-2.5 border-b border-line px-5 py-4 dark:border-brand-900">
+          <div className="flex items-start justify-between gap-2.5 border-b border-rail-line px-5 py-4">
             {/* Brand lockup: day/night image follows the theme; click returns home */}
             <div
               role="button"
@@ -420,29 +433,21 @@ function AppInner() {
               }}
               title="Back to dashboard"
               aria-label="AdensaOps, back to dashboard"
-              className="min-w-0 cursor-pointer rounded-lg transition-opacity duration-200 hover:opacity-75 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#C9A227]"
+              className="min-w-0 cursor-pointer rounded-lg transition-opacity duration-200 hover:opacity-75 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
             >
               {/* w-full + max-w so the lockup shrinks beside the toggle buttons
                   instead of overlapping them (on a phone the old fixed w-40 sat
                   on top of the theme toggle and swallowed every tap on it). */}
               <div className="relative aspect-[410/150] w-full max-w-40">
+                {/* The rail stays charcoal in both themes, so the night
+                    (cream) lockup is always the right one here. */}
                 <img
                   src={lockupNight}
-                  alt=""
-                  aria-hidden="true"
-                  className={`absolute inset-0 h-full w-full object-contain object-left transition-opacity duration-200 ${
-                    theme === 'dark' ? 'opacity-100' : 'opacity-0'
-                  }`}
-                />
-                <img
-                  src={lockupDay}
                   alt="Adensa"
-                  className={`absolute inset-0 h-full w-full object-contain object-left transition-opacity duration-200 ${
-                    theme === 'dark' ? 'opacity-0' : 'opacity-100'
-                  }`}
+                  className="absolute inset-0 h-full w-full object-contain object-left"
                 />
               </div>
-              <span className="mt-1.5 block text-[10px] text-ink-faint dark:text-brand-300">
+              <span className="mt-1.5 block text-[10px] text-rail-ink-soft">
                 Your project, Our Procurement.
               </span>
             </div>
@@ -452,20 +457,20 @@ function AppInner() {
                 onClick={toggleTheme}
                 aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
                 title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
-                className="flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-md text-ink-faint transition hover:bg-subtle hover:text-ink dark:text-brand-300 dark:hover:bg-brand-900 dark:hover:text-white sm:hidden"
+                className="flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-full text-rail-ink-soft transition hover:bg-rail-soft hover:text-white sm:hidden"
               >
                 {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
               </button>
               <button
                 onClick={() => setNavOpen(false)}
                 aria-label="Close navigation"
-                className="flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-md text-ink-faint transition hover:bg-subtle hover:text-ink dark:text-brand-300 dark:hover:bg-brand-900 dark:hover:text-white md:hidden"
+                className="flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-full text-rail-ink-soft transition hover:bg-rail-soft hover:text-white md:hidden"
               >
                 <X size={18} />
               </button>
             </div>
           </div>
-          <nav className="flex-1 space-y-0.5 px-3 py-4">
+          <nav className="flex-1 space-y-1 px-3 py-4">
             {NAV.map((item) => {
               const active = page === item.key
               const Icon = item.icon
@@ -474,19 +479,19 @@ function AppInner() {
                   key={item.key}
                   onClick={() => setPage(item.key)}
                   aria-current={active ? 'page' : undefined}
-                  className={`flex min-h-11 w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm transition ${
+                  className={`flex min-h-11 w-full items-center gap-2.5 rounded-full px-4 py-2 text-left text-sm transition ${
                     active
-                      ? 'bg-brand-600 font-medium text-white shadow-sm shadow-brand-950'
-                      : 'text-ink-soft hover:bg-subtle hover:text-ink dark:text-brand-200 dark:hover:bg-brand-900 dark:hover:text-white'
+                      ? 'bg-brand-600 font-medium text-white'
+                      : 'text-rail-ink-soft hover:bg-rail-soft hover:text-rail-ink'
                   }`}
                 >
-                  <Icon size={16} className={active ? 'text-white' : 'text-ink-faint dark:text-brand-400'} />
+                  <Icon size={16} className={active ? 'text-white' : 'text-rail-ink-soft'} />
                   {item.label}
                 </button>
               )
             })}
           </nav>
-          <div className="border-t border-line px-5 py-4 text-[10px] leading-relaxed text-ink-faint dark:border-brand-900 dark:text-brand-400">
+          <div className="border-t border-rail-line px-5 py-4 text-[10px] leading-relaxed text-rail-ink-soft">
             Adensa Supply &amp; Logistics Ltd.
           </div>
         </aside>
@@ -554,7 +559,7 @@ function AppInner() {
                 onClick={() => setPaletteOpen(true)}
                 aria-label="Search (Command K)"
                 title="Search · Ctrl+K"
-                className="hidden min-h-11 min-w-11 items-center justify-center gap-2 rounded-lg border border-line-strong bg-surface px-2.5 text-ink-soft transition hover:bg-subtle hover:text-ink sm:flex lg:min-w-auto lg:justify-start"
+                className="hidden min-h-11 min-w-11 items-center justify-center gap-2 rounded-full border border-line-strong bg-surface px-3 text-ink-soft transition hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700 sm:flex lg:min-w-auto lg:justify-start lg:px-4 dark:hover:border-brand-700 dark:hover:bg-brand-950/50 dark:hover:text-brand-200"
               >
                 <Search size={16} aria-hidden="true" />
                 <span className="hidden text-xs lg:inline">Search</span>
@@ -564,7 +569,7 @@ function AppInner() {
                 onClick={toggleTheme}
                 aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
                 title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
-                className="hidden min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-lg border border-line-strong bg-surface text-ink-soft transition hover:bg-subtle hover:text-ink sm:flex"
+                className="hidden min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-full border border-line-strong bg-surface text-ink-soft transition hover:bg-subtle hover:text-ink sm:flex"
               >
                 {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
               </button>
@@ -616,13 +621,10 @@ function AppInner() {
             {page === 'dashboard' && (
               <DashboardPage
                 data={data}
+                mode={mode}
                 unreadCount={notifState.unreadCount}
+                onOpenSearch={() => setPaletteOpen(true)}
                 onNavigate={(target) => setPage(target)}
-                onGetStarted={() => {
-                  window.scrollTo({ top: 0, behavior: 'smooth' })
-                  setPage('dashboard')
-                  setNotifOpen(true)
-                }}
               />
             )}
             {page === 'suppliers' && <SuppliersPage data={data} />}
@@ -638,6 +640,8 @@ function AppInner() {
             {page === 'orders' && (
               <OrdersPage
                 data={data}
+                openOrderId={pendingOrderId}
+                onOpenOrderConsumed={() => setPendingOrderId(null)}
                 onNavigate={(target) => setPage(target)}
                 onOrderAction={updateOrder}
               />
@@ -647,6 +651,10 @@ function AppInner() {
                 data={data}
                 mode={mode}
                 onNavigate={(target) => setPage(target)}
+                onViewOrder={(orderId) => {
+                  setPendingOrderId(orderId)
+                  setPage('orders')
+                }}
                 onCreateQuote={createQuote}
                 onSetStatus={setQuoteStatus}
               />
@@ -670,81 +678,78 @@ function AppInner() {
         onNavigate={setPage}
       />
 
-      {/* PIN modal — gates Real data mode on the public deployment */}
-      {pinOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-brand-950/60 px-4"
-          onClick={closePin}
-          role="presentation"
+      {/* PIN modal — gates Real data mode on the public deployment.
+          Radix Dialog supplies the focus trap, Escape handling and aria
+          wiring the hand-rolled version carried; visuals are unchanged. */}
+      <Dialog
+        open={pinOpen}
+        onOpenChange={(open) => {
+          if (!open) closePin()
+        }}
+      >
+        <DialogContent
+          hideClose
+          aria-modal="true"
+          className="w-[calc(100%-2rem)] gap-0"
         >
-          <div
-            ref={pinDialogRef}
-            tabIndex={-1}
-            className="w-full max-w-sm rounded-xl border border-line bg-surface p-6 shadow-xl outline-none"
-            onClick={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="pin-title"
-          >
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300">
-                <Lock size={18} />
-              </div>
-              <div>
-                <h2 id="pin-title" className="text-sm font-semibold text-ink">
-                  Real data is protected
-                </h2>
-                <p className="text-xs text-ink-faint">Enter the admin PIN to view private records.</p>
-              </div>
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300">
+              <Lock size={18} />
             </div>
-            <form onSubmit={submitPin} className="mt-5">
-              <div className="relative">
-                <input
-                  ref={pinInputRef}
-                  type={pinVisible ? 'text' : 'password'}
-                  value={pinValue}
-                  onChange={(e) => setPinValue(e.target.value)}
-                  placeholder="PIN"
-                  autoComplete="off"
-                  inputMode="text"
-                  aria-label="Admin PIN"
-                  className={`w-full rounded-lg border bg-canvas px-3 py-2.5 pr-10 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 ${
-                    pinError
-                      ? 'border-rose-400 focus:ring-rose-300'
-                      : 'border-line-strong focus:ring-brand-300'
-                  }`}
-                />
-                <button
-                  type="button"
-                  onClick={() => setPinVisible((v) => !v)}
-                  aria-label={pinVisible ? 'Hide PIN' : 'Show PIN'}
-                  title={pinVisible ? 'Hide PIN' : 'Show PIN'}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-ink-faint transition hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300"
-                >
-                  {pinVisible ? <EyeOff size={15} /> : <Eye size={15} />}
-                </button>
-              </div>
-              {pinError && <p className="mt-2 text-xs text-rose-600 dark:text-rose-400">{pinError}</p>}
-              <div className="mt-4 flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={closePin}
-                  className="rounded-lg border border-line-strong px-4 py-2 text-xs font-medium text-ink-soft transition hover:bg-subtle"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={pinChecking || pinValue.length === 0}
-                  className="rounded-lg bg-brand-600 px-4 py-2 text-xs font-medium text-white transition hover:bg-brand-700 disabled:opacity-50"
-                >
-                  {pinChecking ? 'Checking…' : 'Unlock'}
-                </button>
-              </div>
-            </form>
+            <div>
+              <DialogTitle>
+                Real data is protected<span className="sr-only"> — enter PIN</span>
+              </DialogTitle>
+              <DialogDescription>Enter the admin PIN to view private records.</DialogDescription>
+            </div>
           </div>
-        </div>
-      )}
+          <form onSubmit={submitPin} className="mt-5">
+            <div className="relative">
+              <input
+                ref={pinInputRef}
+                type={pinVisible ? 'text' : 'password'}
+                value={pinValue}
+                onChange={(e) => setPinValue(e.target.value)}
+                placeholder="PIN"
+                autoComplete="off"
+                inputMode="text"
+                aria-label="Admin PIN"
+                className={`w-full rounded-lg border bg-canvas px-3 py-2.5 pr-10 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 ${
+                  pinError
+                    ? 'border-rose-400 focus:ring-rose-300'
+                    : 'border-line-strong focus:ring-brand-300'
+                }`}
+              />
+              <button
+                type="button"
+                onClick={() => setPinVisible((v) => !v)}
+                aria-label={pinVisible ? 'Hide PIN' : 'Show PIN'}
+                title={pinVisible ? 'Hide PIN' : 'Show PIN'}
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-ink-faint transition hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300"
+              >
+                {pinVisible ? <EyeOff size={15} /> : <Eye size={15} />}
+              </button>
+            </div>
+            {pinError && <p className="mt-2 text-xs text-rose-600 dark:text-rose-400">{pinError}</p>}
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={closePin}
+                className="rounded-lg border border-line-strong px-4 py-2 text-xs font-medium text-ink-soft transition hover:bg-subtle"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={pinChecking || pinValue.length === 0}
+                className="rounded-lg bg-brand-600 px-4 py-2 text-xs font-medium text-white transition hover:bg-brand-700 disabled:opacity-50"
+              >
+                {pinChecking ? 'Checking…' : 'Unlock'}
+              </button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </ThemeContext.Provider>
   )
 }

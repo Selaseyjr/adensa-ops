@@ -1,7 +1,10 @@
-// Shared colour system — one blue family across chips, chart cells, map
-// markers and progress bars. Categories are separated by wide, clearly
-// visible steps of blue (deep navy → royal → sky → light sky → teal-blue)
-// so a category is the same colour everywhere in the app.
+// Shared colour system — deliberately MIXED earthy hues across chips,
+// chart cells, map markers and progress bars: stone neutrals, amber,
+// orange, teal and olive keep every series distinguishable (the primary
+// orange is a highlight, never the whole chart). A category keeps the
+// same colour everywhere in the app — these are all CSS variables defined
+// in index.css for both themes, so a chip on a dark surface uses the
+// dark-mode value automatically.
 //
 // Amber and rose are reserved STRICTLY for alerts (stale price, overdue
 // follow-up, no stock) — they mean "look here", never decoration.
@@ -31,14 +34,14 @@ export const CATEGORY_SHORT: Record<Category, string> = {
   tools: 'Tools',
 };
 
-/** Pipeline stages read as deepening trust: light → mid → deep blue. */
+/** Pipeline stages read as deepening flow: stone → amber → orange → teal → gold. */
 export const STATUS_COLORS: Record<ProspectStatus, string> = {
   identified: 'var(--color-status-identified)',
   contacted: 'var(--color-status-contacted)',
   vetted: 'var(--color-status-vetted)',
 };
 
-/** Blue steps wide enough apart for a six-slice donut. */
+/** Mixed hues wide enough apart for a six-slice donut. */
 export const CUSTOMER_TYPE_COLORS: Record<string, string> = {
   contractor: 'var(--color-ctype-contractor)',
   plumber: 'var(--color-ctype-plumber)',

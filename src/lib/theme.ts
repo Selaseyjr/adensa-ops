@@ -27,7 +27,7 @@ export function applyTheme(theme: Theme): void {
   // Phone and tablet browsers tint the browser chrome with theme-color.
   document
     .querySelector('meta[name="theme-color"]:not([media])')
-    ?.setAttribute('content', theme === 'dark' ? '#070F1F' : '#EAF1FB');
+    ?.setAttribute('content', theme === 'dark' ? '#111111' : '#FAFAF9');
 }
 
 /** Provided by <App>; consumed by components that cannot inherit CSS tokens (Leaflet). */

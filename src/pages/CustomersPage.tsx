@@ -24,7 +24,9 @@ import {
   DonutChart,
   type DonutSlice,
 } from '../components/charts'
-import { Pager, SortableTh, paginate, sortRows, useSort, type SortState } from '../components/table'
+import type { DataTableColumn } from '../components/dataTable'
+import { DataTable } from '../components/dataTable'
+import type { Customer } from '../types'
 import {
   CATEGORIES,
   CategoryChip,
@@ -34,8 +36,6 @@ import {
 
 export function CustomersPage({ data }: { data: Dataset }) {
   const [query, setQuery] = useState(() => new URLSearchParams(window.location.search).get('q') ?? '')
-  const { sort, toggle } = useSort<'name' | 'type' | 'city' | 'followUp'>()
-  const [page, setPage] = useState(0)
 
   // Keep the box in sync when ?q= arrives from the palette or a shared link.
   useEffect(() => {
@@ -63,33 +63,69 @@ export function CustomersPage({ data }: { data: Dataset }) {
       c.city.toLowerCase().includes(q) ||
       (c.phone ?? '').includes(query.trim()),
   )
-  const sorted = sortRows(
-    matching,
-    sort as SortState | null,
-    (c) =>
-      sort?.key === 'name'
-        ? c.name
-        : sort?.key === 'type'
-          ? c.type
-          : sort?.key === 'city'
-            ? c.city
-            : c.nextFollowUp ?? '9999-12-31',
+  // Column definitions for the DataTable. Sorting keys mirror the old table:
+  // Name/type/city/follow-up are sortable; productsNeeded is not (as before).
+  const columns = useMemo<DataTableColumn<Customer>[]>(
+    () => [
+      { id: 'name', accessorFn: (c) => c.name, header: 'Customer', enableSorting: true },
+      { id: 'type', accessorFn: (c) => c.type, header: 'Type', enableSorting: true },
+      { id: 'city', accessorFn: (c) => c.city, header: 'City', enableSorting: true },
+      { id: 'productsNeeded', header: 'Products needed', enableSorting: false },
+      {
+        id: 'followUp',
+        accessorFn: (c) => c.nextFollowUp ?? '9999-12-31',
+        header: 'Next follow-up',
+        enableSorting: true,
+      },
+    ],
+    [],
   )
-  const visibleCustomers = paginate(sorted, page)
+
+  function renderCell(c: Customer, columnId: string): React.ReactNode {
+    switch (columnId) {
+      case 'name':
+        return (
+          <div className="flex items-center gap-2.5">
+            <span
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white"
+              style={{ backgroundColor: CUSTOMER_TYPE_COLORS[c.type] ?? 'var(--color-brand-500)' }}
+            >
+              {c.name.split(' ').map((w) => w[0]).slice(0, 2).join('')}
+            </span>
+            <div className="min-w-0">
+              <div className="font-medium text-ink">{c.name}</div>
+              {c.contactPerson && <div className="text-[11px] text-ink-faint">{c.contactPerson}</div>}
+            </div>
+          </div>
+        )
+      case 'type':
+        return <span className="capitalize text-ink-soft">{c.type}</span>
+      case 'city':
+        return <span className="text-ink-soft">{c.city}</span>
+      case 'productsNeeded':
+        return (
+          <div className="flex flex-wrap gap-1">
+            {c.productsNeeded.map((p) => (
+              <CategoryChip key={p} category={p} />
+            ))}
+          </div>
+        )
+      case 'followUp':
+        return <FollowUpCell date={c.nextFollowUp} />
+      default:
+        return null
+    }
+  }
+
   const typeSlices: DonutSlice[] = useMemo(() => {
     const counts = new Map<string, number>()
     for (const c of data.customers) counts.set(c.type, (counts.get(c.type) ?? 0) + 1)
     return [...counts.entries()].map(([type, value]) => ({
       name: type.charAt(0).toUpperCase() + type.slice(1),
       value,
-      color: CUSTOMER_TYPE_COLORS[type] ?? '#60a5fa',
+      color: CUSTOMER_TYPE_COLORS[type] ?? 'var(--color-brand-500)',
     }))
   }, [data])
-
-  // Keep the pager on page 0 whenever the result set changes shape.
-  useEffect(() => {
-    setPage(0)
-  }, [query])
 
   const demandBars = CATEGORIES.map((cat) => ({
     label: CATEGORY_SHORT[cat],
@@ -127,7 +163,7 @@ export function CustomersPage({ data }: { data: Dataset }) {
                 />
                 <Tooltip
                   contentStyle={CHART_TOOLTIP_STYLE}
-                  cursor={{ fill: 'rgba(96, 165, 250, 0.12)' }}
+                  cursor={{ fill: 'rgba(124, 58, 237, 0.10)' }}
                   formatter={(value) => [`${value} customer${Number(value) === 1 ? '' : 's'}`, 'Need']}
                 />
                 <Bar dataKey="value" radius={[6, 6, 0, 0]} maxBarSize={56}>
@@ -159,67 +195,16 @@ export function CustomersPage({ data }: { data: Dataset }) {
         </div>
       </div>
 
-      <div className="max-h-[70vh] overflow-x-auto overflow-y-auto rounded-xl border border-line bg-surface shadow-sm">
-        <table className={`w-full text-left text-sm ${TABLE_MIN_W}`}>
-          <thead className="sticky top-0 z-10 border-b border-line bg-subtle text-xs uppercase tracking-wide text-ink-faint">
-            <tr>
-              <SortableTh label="Customer" sortKey="name" sort={sort} onToggle={toggle} />
-              <SortableTh label="Type" sortKey="type" sort={sort} onToggle={toggle} />
-              <SortableTh label="City" sortKey="city" sort={sort} onToggle={toggle} />
-              <th className="px-4 py-3 text-left">Products needed</th>
-              <SortableTh label="Next follow-up" sortKey="followUp" sort={sort} onToggle={toggle} />
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-line">
-            {visibleCustomers.map((c) => (
-              <tr key={c.id} className="transition hover:bg-subtle">
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-2.5">
-                    <span
-                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white"
-                      style={{
-                        backgroundColor: CUSTOMER_TYPE_COLORS[c.type] ?? '#60a5fa',
-                      }}
-                    >
-                      {c.name
-                        .split(' ')
-                        .map((w) => w[0])
-                        .slice(0, 2)
-                        .join('')}
-                    </span>
-                    <div className="min-w-0">
-                      <div className="font-medium text-ink">{c.name}</div>
-                      {c.contactPerson && (
-                        <div className="text-[11px] text-ink-faint">{c.contactPerson}</div>
-                      )}
-                    </div>
-                  </div>
-                </td>
-                <td className="px-4 py-3 capitalize text-ink-soft">{c.type}</td>
-                <td className="px-4 py-3 text-ink-soft">{c.city}</td>
-                <td className="px-4 py-3">
-                  <div className="flex flex-wrap gap-1">
-                    {c.productsNeeded.map((p) => (
-                      <CategoryChip key={p} category={p} />
-                    ))}
-                  </div>
-                </td>
-                <td className="px-4 py-3">
-                  <FollowUpCell date={c.nextFollowUp} />
-                </td>
-              </tr>
-            ))}
-            {visibleCustomers.length === 0 && (
-              <tr>
-                <td colSpan={5} className="px-4 py-10 text-center text-ink-faint">
-                  {q ? `No customers match “${query.trim()}”.` : 'No customer records yet.'}
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-        <Pager page={page} total={sorted.length} onPage={setPage} noun="Customers" />
-      </div>
+      <DataTable
+        columns={columns}
+        data={matching}
+        getRowId={(c) => c.id}
+        renderCell={renderCell}
+        noun="Customers"
+        containerClassName="max-h-[70vh] overflow-y-auto"
+        tableClassName={TABLE_MIN_W}
+        emptyMessage={q ? `No customers match “${query.trim()}”.` : 'No customer records yet.'}
+      />
     </div>
   )
 }

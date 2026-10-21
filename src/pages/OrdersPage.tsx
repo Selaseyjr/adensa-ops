@@ -26,8 +26,11 @@ import {
   ClipboardCheck,
   Download,
   PackageCheck,
+  Pencil,
+  Plus,
   Search,
   Send,
+  Trash2,
   Truck,
   Wallet,
 } from 'lucide-react'
@@ -58,7 +61,7 @@ const inputCls =
 const labelCls = 'block text-[11px] font-medium text-ink-soft'
 
 /** One action the operator can take for the order's current stage. */
-type Panel = 'none' | 'deposit' | 'payment' | 'delivery' | 'settle'
+type Panel = 'none' | 'deposit' | 'payment' | 'delivery' | 'settle' | 'edit'
 
 function balanceOf(o: Order): number {
   return Math.max(0, o.valueGhs - o.depositGhs)
@@ -85,6 +88,14 @@ function StageChip({ stage }: { stage: OrderStage }) {
       {ORDER_STAGE_LABELS[stage]}
     </span>
   )
+}
+
+/** One editable row in the order Edit form. */
+interface EditLine {
+  key: number;
+  description: string;
+  qty: string;
+  unitGhs: string;
 }
 
 /** Received-vs-contract bar — the cash position of one order at a glance. */
@@ -140,10 +151,15 @@ function StageStepper({ current }: { current: OrderStage }) {
 
 export function OrdersPage({
   data,
+  openOrderId,
+  onOpenOrderConsumed,
   onNavigate,
   onOrderAction,
 }: {
   data: Dataset
+  /** Order handed over from another page (quote builder View) to open at mount. */
+  openOrderId?: string | null
+  onOpenOrderConsumed?: () => void
   onNavigate: (target: NotificationTarget) => void
   onOrderAction: (
     orderId: string,
@@ -168,6 +184,24 @@ export function OrdersPage({
   const [condition, setCondition] = useState<DeliveryCondition>('complete')
   const [delNote, setDelNote] = useState('')
   const [delError, setDelError] = useState('')
+
+  // Edit form (pre-approval corrections): draft copies of the order's
+  // own fields; saving writes an override, cash records stay untouched.
+  const [editLines, setEditLines] = useState<EditLine[]>([])
+  const [editReceived, setEditReceived] = useState('')
+  const [editExpected, setEditExpected] = useState('')
+  const [editNotes, setEditNotes] = useState('')
+  const [editError, setEditError] = useState('')
+
+  // Cross-page handoff: another page asked for this order's popup to open.
+  useEffect(() => {
+    if (!openOrderId) return
+    if (data.orders.some((o) => o.id === openOrderId)) {
+      setOpenId(openOrderId)
+      setPanel('none')
+    }
+    onOpenOrderConsumed?.()
+  }, [openOrderId, data.orders, onOpenOrderConsumed])
 
   // ?q= is the URL's search state (palette and shared links set it).
   useEffect(() => {
@@ -249,6 +283,11 @@ export function OrdersPage({
     setCondition('complete')
     setDelNote('')
     setDelError('')
+    setEditLines([])
+    setEditReceived('')
+    setEditExpected('')
+    setEditNotes('')
+    setEditError('')
   }
 
   function show(o: Order) {
@@ -256,6 +295,77 @@ export function OrdersPage({
     setPanel('none')
     setAmountError('')
     setDelError('')
+  }
+
+  /** Seed the Edit form from the order's current details. */
+  function openEdit(o: Order) {
+    setEditLines(
+      o.lines.map((l, i) => ({
+        key: i,
+        description: l.description,
+        qty: String(l.qty),
+        unitGhs: String(l.unitGhs),
+      })),
+    )
+    setEditReceived(o.receivedOn)
+    setEditExpected(o.expectedDelivery ?? '')
+    setEditNotes(o.notes ?? '')
+    setEditError('')
+    setPanel('edit')
+  }
+
+  function patchEditLine(key: number, patch: Partial<EditLine>) {
+    setEditLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)))
+  }
+
+  /** Manager corrections before approval. Cash records are never touched:
+      the new contract value may not dip below cash already received. */
+  function submitEdit(o: Order) {
+    const trimmed = editLines
+      .map((l) => ({
+        description: l.description.trim(),
+        qty: Number.parseFloat(l.qty),
+        unitGhs: Number.parseFloat(l.unitGhs),
+      }))
+      .filter((l) => l.description.length > 0)
+    if (trimmed.length === 0) {
+      setEditError('An order needs at least one line item.')
+      return
+    }
+    for (const l of trimmed) {
+      if (!Number.isFinite(l.qty) || l.qty <= 0) {
+        setEditError(`Quantity for "${l.description}" must be greater than zero.`)
+        return
+      }
+      if (!Number.isFinite(l.unitGhs) || l.unitGhs < 0) {
+        setEditError(`Unit price for "${l.description}" cannot be negative.`)
+        return
+      }
+    }
+    if (!editReceived) {
+      setEditError('The received date is required.')
+      return
+    }
+    const valueGhs = trimmed.reduce((sum, l) => sum + l.qty * l.unitGhs, 0)
+    if (valueGhs < o.depositGhs) {
+      setEditError(
+        `Contract value cannot fall below the ${ghs(o.depositGhs)} already received on this order.`,
+      )
+      return
+    }
+    setEditError('')
+    onOrderAction(
+      o.id,
+      {
+        lines: trimmed.map((l) => ({ description: l.description, qty: l.qty, unitGhs: l.unitGhs })),
+        valueGhs,
+        receivedOn: editReceived,
+        expectedDelivery: editExpected.trim(),
+        notes: editNotes.trim(),
+      },
+      { message: `${o.id} details updated · new contract value ${ghs(valueGhs)}.` },
+    )
+    setPanel('none')
   }
 
   function parseAmount(raw: string, max: number): number | null {
@@ -586,6 +696,16 @@ export function OrdersPage({
                 <CheckCircle2 size={12} className="text-success" aria-hidden="true" />
                 Every stage change and payment can be undone from the toast.
               </span>
+              <span className="flex items-center gap-2">
+              {open.stage !== 'settled' && (
+                <button
+                  type="button"
+                  onClick={() => openEdit(open)}
+                  className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-[11px] font-medium text-ink transition hover:border-brand-400 hover:text-brand-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 dark:hover:border-brand-600 dark:hover:text-brand-400"
+                >
+                  <Pencil size={13} aria-hidden="true" /> Edit
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => downloadInvoicePdf(open, data.customers)}
@@ -593,6 +713,7 @@ export function OrdersPage({
               >
                 <Download size={13} aria-hidden="true" /> Invoice PDF
               </button>
+              </span>
             </span>
           }
         >
@@ -923,10 +1044,150 @@ export function OrdersPage({
                 </div>
               )}
 
+              {panel === 'edit' && (
+                <div className="space-y-4">
+                  <p className="text-xs text-ink-soft">
+                    Correct the order details before approval. Cash records stay
+                    as they are; the contract value follows the lines below.
+                  </p>
+
+                  <div className="space-y-2">
+                    <span className={labelCls}>Line items</span>
+                    {editLines.map((l, i) => (
+                      <div key={l.key} className="flex items-start gap-2">
+                        <input
+                          aria-label={`Item ${i + 1} description`}
+                          value={l.description}
+                          onChange={(e) => patchEditLine(l.key, { description: e.target.value })}
+                          placeholder="Item"
+                          className={`${inputCls} min-w-0 flex-1`}
+                        />
+                        <input
+                          aria-label={`Item ${i + 1} quantity`}
+                          value={l.qty}
+                          onChange={(e) => patchEditLine(l.key, { qty: e.target.value })}
+                          inputMode="decimal"
+                          className={`${inputCls} w-20 text-right`}
+                        />
+                        <input
+                          aria-label={`Item ${i + 1} unit price (GH¢)`}
+                          value={l.unitGhs}
+                          onChange={(e) => patchEditLine(l.key, { unitGhs: e.target.value })}
+                          inputMode="decimal"
+                          className={`${inputCls} w-28 text-right`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setEditLines((ls) => ls.filter((x) => x.key !== l.key))}
+                          aria-label={`Remove item ${i + 1}`}
+                          className="mt-1.5 shrink-0 rounded-lg p-1.5 text-ink-faint transition hover:bg-track hover:text-rose-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300"
+                        >
+                          <Trash2 size={15} aria-hidden="true" />
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setEditLines((ls) => [
+                          ...ls,
+                          { key: Math.max(0, ...ls.map((l) => l.key)) + 1, description: '', qty: '1', unitGhs: '' },
+                        ])
+                      }
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-line-strong px-3 py-1.5 text-[11px] font-medium text-ink-soft transition hover:bg-track"
+                    >
+                      <Plus size={12} aria-hidden="true" /> Add item
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <div>
+                      <label className={labelCls} htmlFor="edit-received">
+                        Received on
+                      </label>
+                      <input
+                        id="edit-received"
+                        type="date"
+                        value={editReceived}
+                        onChange={(e) => {
+                          setEditReceived(e.target.value)
+                          setEditError('')
+                        }}
+                        className={`${inputCls} mt-1.5`}
+                      />
+                    </div>
+                    <div>
+                      <label className={labelCls} htmlFor="edit-expected">
+                        Promised delivery
+                      </label>
+                      <input
+                        id="edit-expected"
+                        type="date"
+                        value={editExpected}
+                        onChange={(e) => {
+                          setEditExpected(e.target.value)
+                          setEditError('')
+                        }}
+                        className={`${inputCls} mt-1.5`}
+                      />
+                    </div>
+                    <div>
+                      <span className={labelCls}>Contract value</span>
+                      <div className="num mt-1.5 rounded-lg border border-line bg-subtle px-3 py-2 text-sm font-semibold text-ink">
+                        {ghs(
+                          editLines.reduce((sum, l) => {
+                            const qty = Number.parseFloat(l.qty)
+                            const unit = Number.parseFloat(l.unitGhs)
+                            return sum + (Number.isFinite(qty) && Number.isFinite(unit) ? qty * unit : 0)
+                          }, 0),
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className={labelCls} htmlFor="edit-notes">
+                      Note (optional)
+                    </label>
+                    <textarea
+                      id="edit-notes"
+                      value={editNotes}
+                      onChange={(e) => {
+                        setEditNotes(e.target.value)
+                        setEditError('')
+                      }}
+                      rows={2}
+                      placeholder="e.g. Customer confirmed the cable spec downgrade"
+                      className={`${inputCls} mt-1.5 resize-none`}
+                    />
+                  </div>
+
+                  {editError && <p className="text-xs text-rose-600 dark:text-rose-400">{editError}</p>}
+
+                  <div className="flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setPanel('none')}
+                      className="rounded-lg border border-line-strong px-4 py-2 text-xs font-medium text-ink-soft transition hover:bg-track"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => submitEdit(open)}
+                      className="rounded-lg bg-brand-600 px-4 py-2 text-xs font-medium text-white transition hover:bg-brand-700"
+                    >
+                      Save changes
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {panel === 'none' && (
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <p className="min-w-0 text-xs text-ink-soft">
-                    {open.stage === 'draft' && 'Not yet sent. Move it to Quoted when the offer goes to the customer.'}
+                    {open.stage === 'draft' &&
+                      'Review the details (use Edit to fix anything), then approve it into the pipeline.'}
                     {open.stage === 'quoted' && 'Cash-flow rule: the deposit lands before we commit to a supplier.'}
                     {open.stage === 'deposit' &&
                       (open.depositGhs > 0
@@ -942,11 +1203,11 @@ export function OrdersPage({
                       <button
                         type="button"
                         onClick={() =>
-                          onOrderAction(open.id, { stage: 'quoted' }, { message: `${open.id} marked as quoted.` })
+                          onOrderAction(open.id, { stage: 'quoted' }, { message: `${open.id} approved and marked as quoted.` })
                         }
                         className="flex min-h-11 items-center gap-1.5 rounded-lg bg-brand-600 px-4 py-2 text-xs font-medium text-white transition hover:bg-brand-700"
                       >
-                        <Send size={14} aria-hidden="true" /> Mark as quoted
+                        <CheckCircle2 size={14} aria-hidden="true" /> Approve order
                       </button>
                     )}
                     {open.stage === 'quoted' && (

@@ -66,7 +66,7 @@ export function CategoryChip({ category }: { category: Category }) {
   )
 }
 
-export function Sparkline({ data, color = '#2563eb' }: { data: number[]; color?: string }) {
+export function Sparkline({ data, color = 'var(--color-brand-500)' }: { data: number[]; color?: string }) {
   if (data.length < 2) return null
   const min = Math.min(...data)
   const max = Math.max(...data)
@@ -180,7 +180,7 @@ export function StatCard({
     </>
   )
   if (!onClick) {
-    return <div className={`min-w-0 rounded-xl border border-line bg-surface p-4 shadow-sm ${hud ? 'hud-panel' : ''} ${className}`} style={pop}>{body}</div>
+    return <div className={`min-w-0 rounded-2xl border border-line bg-surface p-4 shadow-sm ${hud ? 'hud-panel' : ''} ${className}`} style={pop}>{body}</div>
   }
   return (
     <button
@@ -188,7 +188,7 @@ export function StatCard({
       onClick={onClick}
       aria-haspopup="dialog"
       aria-label={`${label}. ${hint}`}
-      className={`group min-w-0 w-full rounded-xl border border-line bg-surface p-4 text-left shadow-sm transition hover:border-brand-300 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 dark:hover:border-brand-700 ${hud ? 'hud-panel' : ''} ${className}`}
+      className={`group min-w-0 w-full rounded-2xl border border-line bg-surface p-4 text-left shadow-sm transition hover:border-brand-300 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 dark:hover:border-brand-700 ${hud ? 'hud-panel' : ''} ${className}`}
       style={pop}
     >
       {body}
@@ -311,7 +311,7 @@ export function KpiDetailModal({
         aria-modal="true"
         aria-label={title}
         onClick={(e) => e.stopPropagation()}
-        className="flex max-h-[85vh] w-full max-w-3xl flex-col rounded-xl border border-line bg-surface shadow-xl outline-none"
+        className="flex max-h-[85vh] w-full max-w-3xl flex-col rounded-2xl border border-line bg-surface shadow-xl outline-none"
       >
         <div className="flex items-start justify-between gap-3 border-b border-line px-5 py-4">
           <div className="min-w-0">

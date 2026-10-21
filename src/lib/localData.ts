@@ -9,7 +9,7 @@
 // When the app moves to Cloudflare D1, only this file's load/save change;
 // the UI keeps calling the same add/override helpers via App.
 
-import type { CashEntry, Customer, Inquiry, Order, Quote, QuoteStatus } from '../types';
+import type { CashEntry, Customer, Inquiry, Order, OrderLine, Quote, QuoteStatus } from '../types';
 import type { DataMode, Dataset } from './dataSource';
 
 /** Status changes made in the UI, applied over any quote (seeded or local). */
@@ -23,6 +23,10 @@ export interface QuoteOverride {
 export interface OrderOverride {
   stage?: Order['stage'];
   depositGhs?: number;
+  /** Detail edits from the manager's Edit form (pre-approval corrections). */
+  lines?: OrderLine[];
+  valueGhs?: number;
+  receivedOn?: string;
   expectedDelivery?: string;
   completedOn?: string;
   receipt?: Order['receipt'];

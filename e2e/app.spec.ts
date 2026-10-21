@@ -42,7 +42,7 @@ test.describe('theme on phone and tablet', () => {
 
     await expect(page.locator('html')).toHaveClass(/dark/)
     // Browser chrome tint follows the theme (PWA-style theme-color meta).
-    await expect(page.locator('meta[name="theme-color"]:not([media])')).toHaveAttribute('content', '#070F1F')
+    await expect(page.locator('meta[name="theme-color"]:not([media])')).toHaveAttribute('content', '#111111')
     // Persisted across reloads.
     await page.reload()
     await expect(page.locator('html')).toHaveClass(/dark/)
@@ -59,7 +59,7 @@ test.describe('theme on phone and tablet', () => {
     await expect(page.locator('html')).toHaveClass(/dark/)
     await page.getByRole('button', { name: 'Switch to light mode' }).click()
     await expect(page.locator('html')).not.toHaveClass(/dark/)
-    await expect(page.locator('meta[name="theme-color"]:not([media])')).toHaveAttribute('content', '#EAF1FB')
+    await expect(page.locator('meta[name="theme-color"]:not([media])')).toHaveAttribute('content', '#FAFAF9')
 
     expect(errors).toEqual([])
   })

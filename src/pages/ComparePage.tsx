@@ -103,8 +103,8 @@ export function ComparePage({ data }: { data: Dataset }) {
       ? reference.reduce((sum, r) => sum + r.ghs, 0) / reference.length
       : undefined
 
-  // Stacked unit + transport bars per supplier. Best row goes deep navy so
-  // "the winner" reads instantly without leaving the blue family.
+  // Stacked unit + transport bars per supplier. Best row goes success teal so
+  // "the winner" reads instantly without entering the orange accent lane.
   const chartData = rows.map((r) => ({
     name: (r.supplier?.name ?? 'Unknown').split(' ')[0],
     unit: r.quote.ghs,
@@ -126,8 +126,8 @@ export function ComparePage({ data }: { data: Dataset }) {
               <AreaChart data={timeline} margin={{ top: 8, right: 8, left: -22, bottom: 0 }}>
                 <defs>
                   <linearGradient id="gradQuoted" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#2563eb" stopOpacity={0.35} />
-                    <stop offset="100%" stopColor="#2563eb" stopOpacity={0.02} />
+                    <stop offset="0%" stopColor="var(--color-brand-500)" stopOpacity={0.35} />
+                    <stop offset="100%" stopColor="var(--color-brand-500)" stopOpacity={0.02} />
                   </linearGradient>
                   <linearGradient id="gradRef" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor={ALERT_AMBER} stopOpacity={0.35} />
@@ -169,7 +169,7 @@ export function ComparePage({ data }: { data: Dataset }) {
                   dataKey="quoted"
                   name="Quoted prices"
                   stackId="1"
-                  stroke="#2563eb"
+                  stroke="var(--color-brand-500)"
                   strokeWidth={2}
                   fill="url(#gradQuoted)"
                 />
@@ -250,7 +250,7 @@ export function ComparePage({ data }: { data: Dataset }) {
               />
               <Tooltip
                 contentStyle={CHART_TOOLTIP_STYLE}
-                cursor={{ fill: 'rgba(96, 165, 250, 0.10)' }}
+                cursor={{ fill: 'rgba(124, 58, 237, 0.10)' }}
                 formatter={(value, name) => [ghs(Number(value)), name === 'unit' ? 'Unit price' : 'Transport']}
               />
               {refAvg !== undefined && (
@@ -268,12 +268,12 @@ export function ComparePage({ data }: { data: Dataset }) {
               )}
               <Bar dataKey="unit" name="unit" stackId="cost" radius={[0, 0, 0, 0]}>
                 {chartData.map((d) => (
-                  <Cell key={d.name} fill={d.best ? SUCCESS_BLUE : '#2563eb'} />
+                  <Cell key={d.name} fill={d.best ? SUCCESS_BLUE : 'var(--color-stage-ordered)'} />
                 ))}
               </Bar>
               <Bar dataKey="transport" name="transport" stackId="cost" radius={[0, 6, 6, 0]}>
                 {chartData.map((d) => (
-                  <Cell key={d.name} fill={d.best ? '#60a5fa' : SUCCESS_BLUE_SOFT} />
+                  <Cell key={d.name} fill={d.best ? 'var(--color-cat-safety)' : SUCCESS_BLUE_SOFT} />
                 ))}
               </Bar>
             </BarChart>

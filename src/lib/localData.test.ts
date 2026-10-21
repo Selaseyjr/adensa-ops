@@ -75,6 +75,30 @@ describe('mergeDataset', () => {
     expect(merged.orders.find((o) => o.id === seeded.id)?.stage).toBe('settled')
   })
 
+  it('applies detail-edit overrides (lines, value, dates, notes) over a seeded order', () => {
+    const seeded = demo.orders[0]
+    const merged = mergeDataset(demo, {
+      ...EMPTY,
+      orderOverrides: {
+        [seeded.id]: {
+          lines: [{ description: 'Corrected item', qty: 2, unitGhs: 100 }],
+          valueGhs: 200,
+          receivedOn: '2026-10-05',
+          expectedDelivery: '2026-10-20',
+          notes: 'Manager correction before approval.',
+        },
+      },
+    })
+    const order = merged.orders.find((o) => o.id === seeded.id)!
+    expect(order.lines).toEqual([{ description: 'Corrected item', qty: 2, unitGhs: 100 }])
+    expect(order.valueGhs).toBe(200)
+    expect(order.receivedOn).toBe('2026-10-05')
+    expect(order.expectedDelivery).toBe('2026-10-20')
+    expect(order.notes).toBe('Manager correction before approval.')
+    // Cash already recorded on the order is untouched by a detail edit.
+    expect(order.depositGhs).toBe(seeded.depositGhs)
+  })
+
   it('keeps seed and local records side by side', () => {
     const merged = mergeDataset(demo, {
       ...EMPTY,

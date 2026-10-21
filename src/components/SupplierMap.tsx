@@ -100,11 +100,11 @@ export function SupplierMap({
       marker.bindPopup(
         `
         <div style="min-width: 180px">
-          <div style="font-weight: 600; color: #0f172a">${escapeHtml(s.name)}</div>
+          <div style="font-weight: 600; color: var(--color-ink)">${escapeHtml(s.name)}</div>
           <div style="color: ${color}; font-size: 11px; margin-top: 2px">${CATEGORY_LABELS[s.category]}</div>
-          <div style="color: #64748b; margin-top: 6px">${escapeHtml(s.location)}${s.city ? `, ${escapeHtml(s.city)}` : ''}</div>
-          ${s.phone || s.whatsapp ? `<div style="color: #64748b; margin-top: 2px">${escapeHtml(s.phone ?? s.whatsapp ?? '')}</div>` : ''}
-          <div style="margin-top: 6px; text-transform: capitalize; color: #334155; font-size: 11px">Status: ${s.status}</div>
+          <div style="color: var(--color-ink-faint); margin-top: 6px">${escapeHtml(s.location)}${s.city ? `, ${escapeHtml(s.city)}` : ''}</div>
+          ${s.phone || s.whatsapp ? `<div style="color: var(--color-ink-faint); margin-top: 2px">${escapeHtml(s.phone ?? s.whatsapp ?? '')}</div>` : ''}
+          <div style="margin-top: 6px; text-transform: capitalize; color: var(--color-ink-soft); font-size: 11px">Status: ${s.status}</div>
         </div>
         `,
       )

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Check, FileText, Plus, Printer, Trash2, X } from 'lucide-react'
+import { Check, Eye, FileText, Plus, Printer, Trash2, X } from 'lucide-react'
 import type { DataMode } from './lib/dataSource'
 import type { NotificationTarget } from './lib/notifications'
 import { ALERT_AMBER } from './lib/colors'
@@ -8,6 +8,7 @@ import {
   daysSince,
   quoteLineTotals,
   type Customer,
+  type Order,
   type Quote,
   type QuoteLine,
   type QuoteStatus,
@@ -564,12 +565,15 @@ export function QuoteBuilderPage({
   data,
   mode,
   onNavigate,
+  onViewOrder,
   onCreateQuote,
   onSetStatus,
 }: {
-  data: { customers: Customer[]; quotes: Quote[] }
+  data: { customers: Customer[]; quotes: Quote[]; orders: Order[] }
   mode: DataMode
   onNavigate: (target: NotificationTarget) => void
+  /** Open the order detail popup on the Orders page for a reviewed order. */
+  onViewOrder: (orderId: string) => void
   onCreateQuote: (q: Quote, newCustomer: Customer | null) => void
   onSetStatus: (quoteId: string, status: QuoteStatus) => void
 }) {
@@ -590,6 +594,12 @@ export function QuoteBuilderPage({
 
   const sheetQuote = sheetQuoteId ? data.quotes.find((q) => q.id === sheetQuoteId) : undefined
   const customerOf = (q: Quote) => data.customers.find((c) => c.id === q.customerId)
+
+  // Draft orders are the approval gate: a manager checks the details (and can
+  // edit them from the order popup) before the pipeline starts moving.
+  const awaitingApproval = data.orders
+    .filter((o) => o.stage === 'draft')
+    .sort((a, b) => b.receivedOn.localeCompare(a.receivedOn))
 
   return (
     <div className="space-y-5">
@@ -737,6 +747,47 @@ export function QuoteBuilderPage({
             </tbody>
           </table>
         </div>
+      )}
+
+      {/* Orders awaiting approval — accepted quotes become draft orders that
+          a manager reviews, edits if needed, then approves into the pipeline. */}
+      {awaitingApproval.length > 0 && (
+        <section className="rounded-xl border border-line bg-surface shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-5 py-3.5">
+            <div>
+              <h3 className="text-sm font-semibold text-ink">Orders awaiting approval</h3>
+              <p className="mt-0.5 text-xs text-ink-faint">
+                {awaitingApproval.length} draft order
+                {awaitingApproval.length === 1 ? '' : 's'} · review the details, then approve
+              </p>
+            </div>
+          </div>
+          <ul className="divide-y divide-line">
+            {awaitingApproval.map((o) => {
+              const customer = data.customers.find((c) => c.id === o.customerId)?.name ?? 'Customer'
+              return (
+                <li key={o.id} className="flex flex-wrap items-center gap-3 px-5 py-3">
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium text-ink">
+                      {o.id} · {customer}
+                    </span>
+                    <span className="num block text-[11px] text-ink-faint">
+                      {ghs(o.valueGhs)} · {o.lines.length} line{o.lines.length === 1 ? '' : 's'} ·
+                      opened {o.receivedOn}
+                    </span>
+                  </span>
+                  <button
+                    onClick={() => onViewOrder(o.id)}
+                    aria-label={`View ${o.id}`}
+                    className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-line-strong px-3 py-1.5 text-xs font-medium text-ink-soft transition hover:border-brand-400 hover:text-brand-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 dark:hover:border-brand-600 dark:hover:text-brand-400"
+                  >
+                    <Eye size={14} aria-hidden="true" /> View
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        </section>
       )}
 
       {/* Accepted → next step */}

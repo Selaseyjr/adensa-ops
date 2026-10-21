@@ -1,29 +1,27 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import {
   AlertTriangle,
   ArrowRight,
+  BarChart3,
   Bell,
   CalendarClock,
   CheckCircle2,
+  ClipboardList,
   Clock,
+  FileText,
+  MapPin,
   PackageSearch,
-  Tag,
-  TrendingDown,
-  TrendingUp,
+  Search,
   type LucideIcon,
   Users,
   Wallet,
 } from 'lucide-react'
-import type { Dataset } from '../lib/dataSource'
+import type { DataMode, Dataset } from '../lib/dataSource'
 import type { NotificationTarget } from '../lib/notifications'
-import {
-  ALERT_AMBER,
-  CATEGORY_COLORS,
-  CATEGORY_SHORT,
-} from '../lib/colors'
-import { ChartCard } from '../components/charts'
+import { CATEGORY_COLORS, CATEGORY_SHORT } from '../lib/colors'
 import { EmptyState } from '../components/states'
 import { SupplierMap } from '../components/SupplierMap'
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../components/ui/dialog'
 import {
   ORDER_STAGES,
   ORDER_STAGE_LABELS,
@@ -44,21 +42,72 @@ import {
   KpiDetailModal,
   MapLegend,
   STAGE_COLORS,
-  StatCard,
   fmtDay,
   ghs,
   localIso,
 } from './shared'
 
+type ScheduleKind = 'delivery' | 'followup' | 'inquiry'
+
+/** Chip tint per schedule kind. Meaning is never colour-alone: every chip
+ *  also spells the kind out in words. */
+const SCHEDULE_TONE: Record<ScheduleKind, string> = {
+  delivery: 'bg-brand-50 text-brand-700 dark:bg-brand-950/60 dark:text-brand-300',
+  followup: 'bg-teal-50 text-teal-700 dark:bg-teal-950/60 dark:text-teal-300',
+  inquiry: 'bg-subtle text-ink-soft dark:bg-subtle',
+}
+
+/** Flat panel shell for the dashboard — tone over borders: a whisper of
+ *  shadow on light, a charcoal ring in dark. Never nested. */
+function Panel({
+  icon: Icon,
+  title,
+  sub,
+  action,
+  children,
+  className = '',
+}: {
+  icon?: LucideIcon
+  title: string
+  sub?: string
+  action?: ReactNode
+  children: ReactNode
+  className?: string
+}) {
+  return (
+    <section
+      className={`flex min-w-0 flex-col rounded-xl bg-surface p-4 shadow-[0_1px_3px_rgba(23,23,23,0.05)] sm:p-5 dark:shadow-none dark:ring-1 dark:ring-white/[0.06] ${className}`}
+    >
+      <header className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2">
+          {Icon && (
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-700 dark:bg-brand-950/60 dark:text-brand-300">
+              <Icon size={14} aria-hidden="true" />
+            </span>
+          )}
+          <div className="min-w-0">
+            <h3 className="text-sm font-semibold text-ink">{title}</h3>
+            {sub && <p className="mt-0.5 text-xs text-ink-faint">{sub}</p>}
+          </div>
+        </div>
+        {action && <div className="shrink-0">{action}</div>}
+      </header>
+      <div className="mt-3 min-w-0 flex-1">{children}</div>
+    </section>
+  )
+}
+
 export function DashboardPage({
   data,
+  mode,
   unreadCount,
-  onGetStarted,
+  onOpenSearch,
   onNavigate,
 }: {
   data: Dataset
+  mode: DataMode
   unreadCount: number
-  onGetStarted: () => void
+  onOpenSearch: () => void
   onNavigate: (target: NotificationTarget) => void
 }) {
   const monthPrefix = data.meta.month
@@ -66,41 +115,14 @@ export function DashboardPage({
     month: 'long',
   })
   const [kpiDetail, setKpiDetail] = useState<KpiDetailKey | null>(null)
-
-  // The command band (map centred, KPIs flanking) is a desktop-only
-  // composition. Render ONE branch: CSS-hiding both would mount two
-  // Leaflet maps and double every user's tile traffic.
-  const [isXl, setIsXl] = useState(
-    () => typeof window !== 'undefined' && window.matchMedia('(min-width: 1280px)').matches,
-  )
-  useEffect(() => {
-    const mq = window.matchMedia('(min-width: 1280px)')
-    const onChange = (e: MediaQueryListEvent) => setIsXl(e.matches)
-    mq.addEventListener('change', onChange)
-    return () => mq.removeEventListener('change', onChange)
-  }, [])
+  const [briefingOpen, setBriefingOpen] = useState(false)
 
   const today = new Date()
   const todayStr = localIso(today)
-  const tomorrowStr = localIso(new Date(today.getTime() + 86_400_000))
 
   const orders = data.orders
 
   // Money and orders -------------------------------------------------------
-  const revenueMonth = orders
-    .filter(
-      (o) =>
-        (o.stage === 'delivered' || o.stage === 'settled') &&
-        (o.completedOn ?? '').startsWith(monthPrefix),
-    )
-    .reduce((s, o) => s + o.valueGhs, 0)
-  const target = data.meta.revenueTargetGhs
-  const targetPct = target > 0 ? Math.round((revenueMonth / target) * 100) : 0
-  const dayOfMonth = today.getDate()
-  const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate()
-  const pacePct = Math.round((dayOfMonth / daysInMonth) * 100)
-  const onPace = targetPct >= pacePct
-
   const inMotion = orders.filter((o) => IN_MOTION_STAGES.includes(o.stage))
   const inMotionValue = inMotion.reduce((s, o) => s + o.valueGhs, 0)
   const balanceInByOrder = new Map<string, number>()
@@ -161,16 +183,6 @@ export function DashboardPage({
     .filter((c) => c.kind === 'supplier_out' || c.kind === 'expense_out')
     .reduce((s, c) => s + c.ghs, 0)
   const cashAvailable = data.meta.openingCashGhs + cashIn - cashOut
-  const balanceSpark = useMemo(() => {
-    const dates = [...new Set(data.cash.map((c) => c.date))].sort()
-    let bal = data.meta.openingCashGhs
-    return dates.map((d) => {
-      bal += data.cash
-        .filter((c) => c.date === d)
-        .reduce((s, c) => s + (c.kind.endsWith('_in') ? c.ghs : -c.ghs), 0)
-      return bal
-    })
-  }, [data])
   const ledgerRows = [...monthCash]
     .sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id))
     .map((entry) => {
@@ -273,346 +285,775 @@ export function DashboardPage({
     return items.sort((a, b) => weight[a.tone] - weight[b.tone]).slice(0, 8)
   }, [data, orders])
 
-  // Today ------------------------------------------------------------------
-  const todayItems: { icon: LucideIcon; text: string; chip: string; chipTone: string }[] = []
-  for (const o of orders) {
-    if (!o.expectedDelivery) continue
-    if (o.expectedDelivery !== todayStr && o.expectedDelivery !== tomorrowStr) continue
-    if (o.stage !== 'ordered' && o.stage !== 'delivered') continue
-    const customer = data.customers.find((c) => c.id === o.customerId)
-    todayItems.push({
+  // ---- Operational composition ------------------------------------------
+  // Every figure below is computed from the same real records the rest of
+  // the app uses — demo data in demo mode, PIN-gated records in real mode.
+  // Nothing here is generated, estimated or hard-coded.
+  const MS_DAY = 86_400_000
+  const fullDate = today.toLocaleDateString('en-GB', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  })
+  const modeLabel = mode === 'demo' ? 'Demo data' : 'PIN-protected real records'
+
+  // Deliveries still outstanding: an expected date exists and the order has
+  // not been delivered yet. Overdue = that date has already passed.
+  const pendingDeliveries = orders.filter(
+    (o) => o.expectedDelivery && (o.stage === 'deposit' || o.stage === 'ordered'),
+  )
+  const overdueDeliveries = pendingDeliveries.filter(
+    (o) => (o.expectedDelivery ?? '') < todayStr,
+  )
+  const dueTodayDeliveries = pendingDeliveries.filter(
+    (o) => o.expectedDelivery === todayStr,
+  )
+  const futureDeliveries = pendingDeliveries
+    .filter((o) => (o.expectedDelivery ?? '') > todayStr)
+    .sort((a, b) => (a.expectedDelivery ?? '').localeCompare(b.expectedDelivery ?? ''))
+  const nextDeliveryIso = futureDeliveries[0]?.expectedDelivery
+
+  // Quotes waiting longest on the customer.
+  const oldestWaiting =
+    openQuotes.length > 0 ? Math.max(...openQuotes.map((q) => daysSince(q.sentOn))) : 0
+
+  // Procurement spend = supplier payments recorded this month.
+  const spendEntries = data.cash.filter(
+    (c) => c.date.startsWith(monthPrefix) && c.kind === 'supplier_out',
+  )
+  const spendMonth = spendEntries.reduce((s, c) => s + c.ghs, 0)
+
+  // Delivery performance: only COMPLETED orders that carried an expected
+  // date can be measured — numerator and denominator are always shown and
+  // an unmeasurable dataset renders an empty state, never a fake rate.
+  const measuredDeliveries = orders.filter(
+    (o) =>
+      (o.stage === 'delivered' || o.stage === 'settled') && o.expectedDelivery && o.completedOn,
+  )
+  const onTimeDeliveries = measuredDeliveries.filter(
+    (o) => (o.completedOn ?? '') <= (o.expectedDelivery ?? ''),
+  )
+  const onTimePct =
+    measuredDeliveries.length > 0
+      ? Math.round((onTimeDeliveries.length / measuredDeliveries.length) * 100)
+      : 0
+
+  // Operational activity: orders received per week, last 8 weeks, current
+  // week highlighted. Real receivedOn dates only — empty data shows no bars.
+  const mondayOffset = (today.getDay() + 6) % 7 // 0 = Monday
+  const thisMonday = new Date(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate() - mondayOffset,
+  )
+  const activityWeeks = Array.from({ length: 8 }, (_, i) => {
+    const start = new Date(thisMonday.getTime() - (7 - i) * 7 * MS_DAY)
+    const end = new Date(start.getTime() + 7 * MS_DAY)
+    const count = orders.filter((o) => {
+      const t = new Date(`${o.receivedOn}T00:00:00`).getTime()
+      return t >= start.getTime() && t < end.getTime()
+    }).length
+    return {
+      key: `${i}-${start.getTime()}`,
+      label: start.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }),
+      count,
+      current: i === 7,
+    }
+  })
+  const activityMax = Math.max(...activityWeeks.map((w) => w.count), 1)
+  const activityTotal = activityWeeks.reduce((s, w) => s + w.count, 0)
+
+  // Dated commitments from today forward (deliveries + customer follow-ups):
+  // the source for both the Upcoming agenda and the Daily Briefing.
+  interface DatedItem {
+    iso: string
+    kind: ScheduleKind
+    icon: LucideIcon
+    text: string
+    target: NotificationTarget
+  }
+  const datedItems: DatedItem[] = []
+  for (const o of pendingDeliveries) {
+    if (!o.expectedDelivery || o.expectedDelivery < todayStr) continue
+    const customer = data.customers.find((c) => c.id === o.customerId)?.name ?? 'customer'
+    datedItems.push({
+      iso: o.expectedDelivery,
+      kind: 'delivery',
       icon: PackageSearch,
-      text: `${o.id} delivery (${customer?.name ?? 'customer'})`,
-      chip: o.expectedDelivery === todayStr ? 'today' : 'tomorrow',
-      chipTone:
-        o.expectedDelivery === todayStr
-          ? 'bg-brand-50 text-brand-700 dark:bg-brand-950/50 dark:text-brand-300'
-          : 'bg-subtle text-ink-soft',
+      text: `${o.id} delivery · ${customer}`,
+      target: 'orders',
     })
   }
   for (const c of data.customers) {
-    if (c.nextFollowUp === todayStr) {
-      todayItems.push({
+    if (c.nextFollowUp && c.nextFollowUp >= todayStr) {
+      datedItems.push({
+        iso: c.nextFollowUp,
+        kind: 'followup',
         icon: Users,
-        text: `Follow-up: ${c.name}`,
-        chip: 'today',
-        chipTone: 'bg-brand-50 text-brand-700 dark:bg-brand-950/50 dark:text-brand-300',
+        text: `Follow-up · ${c.name}`,
+        target: 'customers',
       })
     }
   }
-  for (const i of data.inquiries.filter((i) => i.receivedOn === todayStr)) {
-    todayItems.push({
-      icon: Bell,
-      text: `New inquiry: ${i.customerName}`,
-      chip: i.channel,
-      chipTone: 'bg-subtle text-ink-soft',
-    })
-  }
+  datedItems.sort((a, b) => a.iso.localeCompare(b.iso))
+  const upcomingItems = datedItems.filter((d) => d.iso > todayStr).slice(0, 6)
 
-  // Demand to delivery ------------------------------------------------------
-  const quotesSentMonth = data.quotes.filter((q) => q.sentOn.startsWith(monthPrefix)).length
-  const ordersMonth = orders.filter((o) => o.receivedOn.startsWith(monthPrefix)).length
-  const deliveredMonth = orders.filter(
-    (o) =>
-      (o.stage === 'delivered' || o.stage === 'settled') &&
-      (o.completedOn ?? '').startsWith(monthPrefix),
-  ).length
-  const demandSteps = [
-    { label: 'Inquiries', value: monthInquiries.length },
-    { label: 'Quotes sent', value: quotesSentMonth },
-    { label: 'Orders', value: ordersMonth },
-    { label: 'Delivered', value: deliveredMonth },
+  const dueTodayItems: DatedItem[] = [
+    ...dueTodayDeliveries.map((o): DatedItem => {
+      const customer = data.customers.find((c) => c.id === o.customerId)?.name ?? 'customer'
+      return {
+        iso: todayStr,
+        kind: 'delivery',
+        icon: PackageSearch,
+        text: `${o.id} delivery · ${customer}`,
+        target: 'orders',
+      }
+    }),
+    ...data.customers
+      .filter((c) => c.nextFollowUp === todayStr)
+      .map((c): DatedItem => ({
+        iso: todayStr,
+        kind: 'followup',
+        icon: Users,
+        text: `Follow-up · ${c.name}`,
+        target: 'customers',
+      })),
+    ...data.inquiries
+      .filter((i) => i.receivedOn === todayStr)
+      .map((i): DatedItem => ({
+        iso: todayStr,
+        kind: 'inquiry',
+        icon: Bell,
+        text: `New inquiry · ${i.customerName}`,
+        target: 'customers',
+      })),
   ]
 
-  // KPI cards for the command band. Tone is the card's identity: gold for
-  // revenue and cash are money (gold), ops cards are deep blue,
-  // ops, amber for alerts. flex-1 lets the band columns stretch them evenly
-  // (harmless in the stacked grid below xl). Two map sizes: the band map
-  // fills its column height, the stacked layout uses a fixed 360.
-  const kpiRevenue = (
-    <StatCard
-      icon={TrendingUp}
-      tone="var(--color-gold-600)"
-      hud
-      hudHero
-      className="flex-1"
-      label="Revenue"
-      onClick={() => setKpiDetail('revenue')}
-      value={ghs(revenueMonth)}
-      sub={target > 0 ? `${ghs(target)} target for ${monthName}` : `Completed in ${monthName}`}
-      trend={target > 0 ? { dir: onPace ? 'up' : 'down', label: onPace ? 'ahead of pace' : 'behind pace' } : undefined}
-    />
-  )
-  const kpiCash = (
-    <StatCard
-      icon={Wallet}
-      tone="var(--color-gold-600)"
-      hud
-      className="flex-1"
-      label="Cash available"
-      onClick={() => setKpiDetail('cash')}
-      value={ghs(cashAvailable)}
-      sub={`GH¢${receivable.toLocaleString('en-GH')} receivable`}
-      spark={balanceSpark}
-    />
-  )
-  const kpiOrders = (
-    <StatCard icon={PackageSearch} tone="#1d4ed8" hud className="flex-1" label="Orders in motion" onClick={() => setKpiDetail('orders')} value={inMotion.length} sub={`GH¢${inMotionValue.toLocaleString('en-GH')} in play`} />
-  )
-  const kpiQuotes = (
-    <StatCard icon={Tag} tone="#0ea5e9" hud className="flex-1" label="Open quotes" onClick={() => setKpiDetail('quotes')} value={openQuotes.length} sub={openQuotes.length > 0 ? `${ghs(openQuotesValue)} awaiting response` : 'None awaiting response'} />
-  )
-  const kpiInquiries = (
-    <StatCard icon={Bell} tone={ALERT_AMBER} hud className="flex-1" label="Inquiries" onClick={() => setKpiDetail('inquiries')} value={monthInquiries.length} sub={`${newInquiries.length} awaiting reply`} />
-  )
-  // Borderless map: no panel, no title — the map itself is the hero and the
-  // legend carries the context. In the band it fills the column height, so it
-  // absorbs the spare space above it instead of leaving a dead gap.
-  const mapBand = (
-    <div className="flex min-w-0 flex-1 flex-col">
-      <SupplierMap suppliers={data.suppliers} fill />
-      <MapLegend />
-    </div>
-  )
-  const mapWide = (
-    <div className="min-w-0">
-      <SupplierMap suppliers={data.suppliers} height={360} />
-      <MapLegend />
-    </div>
-  )
+  // Daily Briefing: a deterministic compile of today's records — never a
+  // generated summary. Attention first (already oldest-first), then today,
+  // then what is coming up.
+  const briefingAttention = attention.slice(0, 5)
+  const briefingUpcoming = upcomingItems.slice(0, 4)
+  const briefingCount = briefingAttention.length + dueTodayItems.length
+
+  // Four essential KPIs — lightweight metrics with click-throughs into the
+  // existing drill-down modals / orders page. No boxes, no decoration.
+  const kpis: {
+    label: string
+    value: string
+    hint: string
+    tone?: 'amber' | 'success'
+    onClick: () => void
+  }[] = [
+    {
+      label: 'Orders in motion',
+      value: String(inMotion.length),
+      hint: inMotion.length > 0 ? `${ghs(inMotionValue)} in play` : 'No orders in motion',
+      onClick: () => setKpiDetail('orders'),
+    },
+    {
+      label: 'Quotes awaiting',
+      value: String(openQuotes.length),
+      hint:
+        openQuotes.length === 0
+          ? 'All quotes answered'
+          : `${ghs(openQuotesValue)} quoted · oldest ${oldestWaiting}d`,
+      tone: oldestWaiting >= 3 ? 'amber' : undefined,
+      onClick: () => setKpiDetail('quotes'),
+    },
+    {
+      label: 'Deliveries due',
+      value: String(dueTodayDeliveries.length + overdueDeliveries.length),
+      hint:
+        overdueDeliveries.length > 0
+          ? `${overdueDeliveries.length} overdue`
+          : dueTodayDeliveries.length > 0
+            ? `${dueTodayDeliveries.length} due today`
+            : nextDeliveryIso
+              ? `Next ${new Date(`${nextDeliveryIso}T00:00:00`).toLocaleDateString('en-GB', {
+                  weekday: 'short',
+                  day: 'numeric',
+                })}`
+              : 'Nothing scheduled',
+      tone: overdueDeliveries.length > 0 ? 'amber' : undefined,
+      onClick: () => onNavigate('orders'),
+    },
+    {
+      label: 'Procurement spend',
+      value: ghs(spendMonth),
+      hint:
+        spendEntries.length === 0
+          ? 'No supplier payments this month'
+          : `${spendEntries.length} payment${spendEntries.length === 1 ? '' : 's'}${
+              cashOut > 0 ? ` · ${Math.round((spendMonth / cashOut) * 100)}% of money out` : ''
+            }`,
+      onClick: () => setKpiDetail('cash'),
+    },
+  ]
+
+  const stageMax = Math.max(...stageStats.map((s) => s.count), 1)
 
   return (
     <div className="space-y-5">
-      {/* Welcome + month target */}
-      <section className="flex flex-col gap-4 rounded-xl border border-line bg-surface p-5 shadow-sm hud-panel sm:flex-row sm:items-center sm:justify-between">
+      {/* ===== Compact header + four essential KPIs ===== */}
+      <section className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
         <div className="min-w-0">
-          <div className="text-xs font-semibold tracking-widest text-brand-600 dark:text-brand-400">
-            AdensaOps
-          </div>
-          <h2 className="mt-1 text-lg font-bold text-ink">Welcome back!</h2>
-          <p className="mt-1 text-sm text-ink-soft">
-            You have{' '}
-            <strong className="font-semibold text-ink">
-              {unreadCount} unread notification{unreadCount === 1 ? '' : 's'}
-            </strong>.
+          <h2 className="text-xl font-semibold tracking-tight text-ink">Operations overview</h2>
+          <p className="mt-1 text-sm text-ink-faint">
+            {fullDate} · {modeLabel} · {unreadCount} unread notification
+            {unreadCount === 1 ? '' : 's'}
           </p>
         </div>
-        <div className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="sm:border-l sm:border-line sm:pl-5">
-            <div className="text-[10px] font-semibold uppercase tracking-widest text-ink-faint">
-              {monthName} target
-            </div>
-            {target > 0 ? (
-              <>
-                <div className="mt-1 text-sm font-semibold text-ink">
-                  {ghs(revenueMonth)}{' '}
-                  <span className="font-normal text-ink-faint">of {ghs(target)}</span>
-                </div>
-                <div className="mt-2 h-2 w-48 rounded-full bg-track">
-                  <div
-                    className="h-2 rounded-full bg-brand-600 transition-all duration-500"
-                    style={{ width: `${Math.min(100, targetPct)}%` }}
-                  />
-                </div>
-                <div
-                  className={`mt-1.5 inline-flex items-center gap-1 text-[11px] font-medium ${
-                    onPace ? 'text-brand-600 dark:text-brand-400' : 'text-amber-700 dark:text-amber-400'
-                  }`}
-                >
-                  {onPace ? <TrendingUp size={13} /> : <TrendingDown size={13} />}
-                  {targetPct}% of target · {onPace ? 'ahead of pace' : 'behind pace'}
-                </div>
-              </>
-            ) : (
-              <div className="mt-1 text-sm text-ink-faint">No target set</div>
-            )}
+        <div className="flex flex-wrap items-end gap-x-7 gap-y-4 sm:gap-x-10">
+          {kpis.map((k) => (
+            <button
+              key={k.label}
+              type="button"
+              onClick={k.onClick}
+              className="group min-w-0 rounded-md px-1 py-0.5 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
+            >
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-ink-faint">
+                {k.label}
+              </div>
+              <div className="num mt-0.5 text-2xl font-semibold text-ink transition-colors group-hover:text-brand-700 dark:group-hover:text-brand-400">
+                {k.value}
+              </div>
+              <div
+                className={`mt-0.5 flex items-center gap-1 text-[11px] ${
+                  k.tone === 'amber'
+                    ? 'text-amber-700 dark:text-amber-400'
+                    : k.tone === 'success'
+                      ? 'text-success'
+                      : 'text-ink-faint'
+                }`}
+              >
+                {k.tone === 'amber' && <AlertTriangle size={11} aria-hidden="true" />}
+                {k.tone === 'success' && <CheckCircle2 size={11} aria-hidden="true" />}
+                <span className="truncate">{k.hint}</span>
+              </div>
+            </button>
+          ))}
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={onOpenSearch}
+              aria-label="Search suppliers, products, customers, orders and quotes"
+              title="Search · Ctrl+K"
+              className="flex h-9 w-9 items-center justify-center rounded-lg border border-line-strong text-ink-soft transition hover:border-brand-400 hover:text-brand-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 dark:hover:border-brand-600 dark:hover:text-brand-400"
+            >
+              <Search size={15} aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              onClick={() => onNavigate('quotes')}
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-brand-600 px-3.5 text-xs font-semibold text-white transition hover:bg-brand-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-surface"
+            >
+              <FileText size={14} aria-hidden="true" />
+              New quote
+            </button>
           </div>
-          <button
-            onClick={onGetStarted}
-            className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-300"
-          >
-            <Bell size={15} />
-            Let's get started
-            <ArrowRight size={15} />
-          </button>
         </div>
       </section>
 
-      {/* Command band (xl+): the supplier map centred at half height with
-          the KPI cards flanking it — the big-screen board arrangement.
-          Below xl the cards stack and the map runs full width beneath. */}
-      {isXl ? (
-        <div className="grid grid-cols-12 items-stretch gap-4">
-        <div className="flex min-w-0 flex-col gap-4 xl:col-span-4">
-          {kpiRevenue}
-          {kpiCash}
-          {kpiOrders}
-        </div>
-        <div className="flex min-w-0 flex-col gap-4 xl:col-span-4">
-          {mapBand}
-        </div>
-        <div className="flex min-w-0 flex-col gap-4 xl:col-span-4">
-          {kpiQuotes}
-          {kpiInquiries}
-        </div>
-        </div>
-      ) : (
-        <div>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {kpiRevenue}
-          {kpiCash}
-          {kpiOrders}
-          {kpiQuotes}
-          {kpiInquiries}
-        </div>
-          <div className="mt-4">{mapWide}</div>
-        </div>
-      )}
-
-      {/* Order flow */}
-      <ChartCard title="Order flow" sub="Draft to settled, by stage" hud>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          {stageStats.map((st) => (
-            <div key={st.stage} className="rounded-lg border border-line bg-subtle p-3">
-              <div className="flex items-center gap-1.5">
-                <span
-                  className="inline-block h-2 w-2 shrink-0 rounded-full"
-                  style={{ backgroundColor: STAGE_COLORS[st.stage] }}
-                />
-                <span className="truncate text-[11px] font-medium text-ink-soft">
-                  {ORDER_STAGE_LABELS[st.stage]}
-                </span>
-              </div>
-              <div className="mt-1 text-xl font-bold text-ink">{st.count}</div>
-              <div className="text-[11px] text-ink-faint">
-                {st.value > 0 ? ghs(st.value) : 'GH¢0'}
-              </div>
-              {st.oldestDays !== undefined && st.oldestDays >= 1 && (
-                <div className="mt-0.5 text-[10px] text-amber-700 dark:text-amber-400">
-                  oldest {st.oldestDays}d
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-        {orders.length === 0 && (
-          <p className="mt-3 text-[11px] text-ink-faint">No orders recorded yet.</p>
-        )}
-      </ChartCard>
-
-      {/* Attention + Today */}
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-        <ChartCard
-          title="Needs attention"
-          sub="Oldest items first"
-          className="lg:col-span-2"
-         hud>
-          {attention.length === 0 ? (
-            <EmptyState icon={CheckCircle2} title="Nothing needs attention." />
-          ) : (
-            <div className="-mx-2 space-y-0.5">
-              {attention.map((item) => {
-                const Icon = item.icon
-                return (
-                  <button
-                    key={item.key}
-                    onClick={() => onNavigate(item.target)}
-                    className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left transition hover:bg-subtle"
-                  >
-                    <span
-                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${ATTENTION_TONE[item.tone]}`}
+      {/* ===== First viewport: four operational views in one compact row ===== */}
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
+          <Panel icon={BarChart3} title="Order status" sub="Draft to settled, by stage">
+            {stageStats.every((s) => s.count === 0) ? (
+              <EmptyState
+                icon={BarChart3}
+                title="No orders recorded yet."
+                hint="The pipeline fills in as quotes convert to orders."
+              />
+            ) : (
+              <>
+                <ul className="space-y-2.5">
+                  {stageStats.map((st) => (
+                    <li
+                      key={st.stage}
+                      title={`${ORDER_STAGE_LABELS[st.stage]}: ${st.count} order${
+                        st.count === 1 ? '' : 's'
+                      } · ${ghs(st.value)}`}
                     >
-                      <Icon size={15} />
-                    </span>
-                    <span className="min-w-0 flex-1 truncate text-sm text-ink">{item.text}</span>
-                    <span className="shrink-0 rounded-full bg-subtle px-2 py-0.5 text-[11px] font-medium text-ink-soft">
-                      {item.age}
-                    </span>
-                    <ArrowRight size={14} className="shrink-0 text-ink-faint" />
-                  </button>
-                )
-              })}
-            </div>
+                      <div className="flex items-baseline justify-between gap-2 text-xs">
+                        <span className="flex min-w-0 items-center gap-1.5 font-medium text-ink-soft">
+                          <span
+                            className="inline-block h-2 w-2 shrink-0 rounded-full"
+                            style={{ backgroundColor: STAGE_COLORS[st.stage] }}
+                            aria-hidden="true"
+                          />
+                          <span className="truncate">{ORDER_STAGE_LABELS[st.stage]}</span>
+                        </span>
+                        <span className="num shrink-0 font-semibold text-ink">{st.count}</span>
+                      </div>
+                      <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-track" aria-hidden="true">
+                        <div
+                          className="h-full rounded-full transition-all duration-500"
+                          style={{
+                            width: `${Math.round((st.count / stageMax) * 100)}%`,
+                            backgroundColor: STAGE_COLORS[st.stage],
+                          }}
+                        />
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-3 border-t border-line pt-2.5 text-[11px] text-ink-faint">
+                  {orders.length} order{orders.length === 1 ? '' : 's'} in the pipeline ·{' '}
+                  {ghs(orders.reduce((s, o) => s + o.valueGhs, 0))} total value
+                </p>
+              </>
+            )}
+          </Panel>
+
+        <Panel
+          icon={MapPin}
+          title="Operations map"
+          sub={
+            data.suppliers.length === 0
+              ? 'No location data to plot'
+              : `${data.suppliers.length} supplier${data.suppliers.length === 1 ? '' : 's'} across Ghana`
+          }
+        >
+          {data.suppliers.length === 0 ? (
+            <EmptyState
+              icon={MapPin}
+              title="No supplier locations yet."
+              hint="The map fills in as soon as records carry an area or city."
+            />
+          ) : (
+            <>
+              <SupplierMap suppliers={data.suppliers} height={212} />
+              <MapLegend />
+            </>
           )}
-        </ChartCard>
+        </Panel>
 
-        <ChartCard title="Today" sub={today.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' })} hud>
-          {todayItems.length === 0 ? (
-            <EmptyState icon={CalendarClock} title="Nothing scheduled today." />
-          ) : (
-            <div className="space-y-2">
-              {todayItems.map((item, i) => {
-                const Icon = item.icon
-                return (
-                  <div
-                    key={i}
-                    className="flex items-center gap-2.5 rounded-lg border border-line bg-subtle px-3 py-2"
+          <Panel icon={CheckCircle2} title="Delivery performance" sub="Completed orders with an expected date">
+            {measuredDeliveries.length === 0 ? (
+              <EmptyState
+                icon={CheckCircle2}
+                title="No measured deliveries yet."
+                hint="The on-time rate appears once a dated order is completed."
+              />
+            ) : (
+              <>
+                <div className="relative mx-auto w-full max-w-[230px]">
+                  <svg
+                    viewBox="0 0 148 84"
+                    className="w-full"
+                    role="img"
+                    aria-label={`On-time delivery: ${onTimeDeliveries.length} of ${measuredDeliveries.length} (${onTimePct}%)`}
                   >
-                    <Icon size={15} className="shrink-0 text-ink-soft" />
-                    <span className="min-w-0 flex-1 truncate text-xs text-ink">{item.text}</span>
-                    <span
-                      className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${item.chipTone}`}
-                    >
-                      {item.chip}
-                    </span>
+                    <path
+                      d="M 18 74 A 56 56 0 0 1 130 74"
+                      fill="none"
+                      stroke="var(--color-track)"
+                      strokeWidth="11"
+                      strokeLinecap="round"
+                    />
+                    {onTimePct > 0 && (
+                      <path
+                        d="M 18 74 A 56 56 0 0 1 130 74"
+                        fill="none"
+                        stroke="var(--color-brand-500)"
+                        strokeWidth="11"
+                        strokeLinecap="round"
+                        strokeDasharray={`${(onTimePct / 100) * Math.PI * 56} ${Math.PI * 56}`}
+                      />
+                    )}
+                  </svg>
+                  <div className="absolute inset-x-0 bottom-0 text-center">
+                    <span className="num text-2xl font-semibold text-ink">{onTimePct}%</span>
                   </div>
+                </div>
+                <p className="mt-2 text-center text-[11px] text-ink-faint">
+                  {onTimeDeliveries.length} of {measuredDeliveries.length} completed deliveries
+                  arrived on time
+                </p>
+              </>
+            )}
+          </Panel>
+
+          <Panel icon={PackageSearch} title="Procurement activity" sub="Orders received · last 8 weeks">
+            {activityTotal === 0 ? (
+              <EmptyState
+                icon={BarChart3}
+                title="No purchase orders recorded yet."
+                hint="Weekly activity appears as soon as orders are received."
+              />
+            ) : (
+              <>
+                <div
+                  role="img"
+                  aria-label={`Purchase orders received per week, last 8 weeks: ${activityWeeks
+                    .map((w) => `${w.label}, ${w.count}`)
+                    .join('; ')}`}
+                  className="flex h-28 items-end gap-1.5"
+                >
+                  {activityWeeks.map((w) => (
+                    <div
+                      key={w.key}
+                      className="flex h-full min-w-0 flex-1 flex-col justify-end gap-1"
+                    >
+                      {w.count > 0 && (
+                        <span
+                          className={`num text-center text-[10px] font-semibold ${
+                            w.current
+                              ? 'text-brand-700 dark:text-brand-400'
+                              : 'text-ink-faint'
+                          }`}
+                        >
+                          {w.count}
+                        </span>
+                      )}
+                      <div
+                        title={`${w.label}: ${w.count} order${w.count === 1 ? '' : 's'}`}
+                        className={`w-full rounded-t-sm transition-colors ${
+                          w.current
+                            ? 'bg-brand-500'
+                            : 'bg-track hover:bg-line-strong dark:hover:bg-line-strong'
+                        }`}
+                        style={{
+                          height: `${w.count === 0 ? 0 : 16 + (w.count / activityMax) * 50}%`,
+                        }}
+                      />
+                      <span className="w-full truncate text-center text-[8px] text-ink-faint">
+                        {w.label}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-2.5 text-[11px] text-ink-faint">
+                  {activityTotal} order{activityTotal === 1 ? '' : 's'} in 8 weeks · current week
+                  highlighted
+                </p>
+              </>
+            )}
+          </Panel>
+      </div>
+
+      {/* ===== Second row: quotes to action, agenda, and the briefing control ===== */}
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
+          <Panel
+            className="lg:col-span-4"
+            icon={FileText}
+            title="Manage quotes"
+            sub={openQuotes.length > 0 ? `${openQuotes.length} awaiting action` : undefined}
+            action={
+              <button
+                type="button"
+                onClick={() => onNavigate('quotes')}
+                className="text-xs font-medium text-brand-700 transition hover:underline dark:text-brand-400"
+              >
+                View all quotes
+              </button>
+            }
+          >
+            {openQuotes.length === 0 ? (
+              <EmptyState
+                icon={CheckCircle2}
+                title="No quotes awaiting action."
+                hint="Sent quotes appear here until the customer replies."
+              />
+            ) : (
+              <ul className="-mx-2">
+                {[...openQuotes]
+                  .sort((a, b) => a.sentOn.localeCompare(b.sentOn))
+                  .slice(0, 3)
+                  .map((q) => {
+                    const age = daysSince(q.sentOn)
+                    const customer =
+                      data.customers.find((c) => c.id === q.customerId)?.name ?? 'Customer'
+                    return (
+                      <li key={q.id}>
+                        <button
+                          type="button"
+                          onClick={() => onNavigate('quotes')}
+                          className="group flex w-full items-center gap-3 rounded-lg px-2 py-1.5 text-left transition hover:bg-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
+                        >
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-xs font-medium text-ink">
+                              {q.id} · {customer}
+                            </span>
+                            <span className="num block text-[11px] text-ink-faint">
+                              {ghs(q.valueGhs)}
+                            </span>
+                          </span>
+                          <span
+                            className={`shrink-0 text-[11px] font-medium ${
+                              age >= 3
+                                ? 'text-amber-700 dark:text-amber-400'
+                                : 'text-ink-faint'
+                            }`}
+                          >
+                            {age}d waiting
+                          </span>
+                          <ArrowRight
+                            size={13}
+                            aria-hidden="true"
+                            className="shrink-0 text-ink-faint opacity-0 transition group-hover:opacity-100"
+                          />
+                        </button>
+                      </li>
+                    )
+                  })}
+              </ul>
+            )}
+          </Panel>
+
+        <Panel
+          className="lg:col-span-5"
+          icon={CalendarClock}
+          title="Upcoming operations"
+          sub="Dated commitments from today forward"
+        >
+          {upcomingItems.length === 0 ? (
+            <EmptyState
+              icon={CalendarClock}
+              title="Nothing scheduled ahead."
+              hint="Deliveries and follow-ups appear here as soon as they carry a date."
+            />
+          ) : (
+            <ul className="grid gap-2 sm:grid-cols-2">
+              {upcomingItems.map((item, i) => {
+                const Icon = item.icon
+                const d = new Date(`${item.iso}T00:00:00`)
+                const days = Math.round((d.getTime() - today.setHours(0, 0, 0, 0)) / MS_DAY)
+                const dayLabel =
+                  days === 0
+                    ? 'Today'
+                    : days === 1
+                      ? 'Tomorrow'
+                      : d.toLocaleDateString('en-GB', {
+                          weekday: 'short',
+                          day: 'numeric',
+                          month: 'short',
+                        })
+                const kindLabel =
+                  item.kind === 'delivery' ? 'Delivery' : item.kind === 'followup' ? 'Follow-up' : 'Inquiry'
+                return (
+                  <li key={`${item.iso}-${i}`}>
+                    <button
+                      type="button"
+                      onClick={() => onNavigate(item.target)}
+                      className="group flex w-full items-center gap-3 rounded-lg bg-subtle px-3 py-2 text-left transition hover:bg-track focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
+                    >
+                      <span className="flex h-9 w-9 shrink-0 flex-col items-center justify-center rounded-md bg-surface ring-1 ring-line">
+                        <span className="num text-[11px] font-bold leading-none text-ink">
+                          {d.getDate()}
+                        </span>
+                        <span className="text-[8px] uppercase leading-none text-ink-faint">
+                          {d.toLocaleDateString('en-GB', { month: 'short' })}
+                        </span>
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-xs font-medium text-ink">
+                          {item.text}
+                        </span>
+                        <span className="block text-[11px] text-ink-faint">
+                          {dayLabel} · {kindLabel}
+                        </span>
+                      </span>
+                      <Icon
+                        size={14}
+                        aria-hidden="true"
+                        className={`shrink-0 ${
+                          item.kind === 'delivery'
+                            ? 'text-brand-600 dark:text-brand-400'
+                            : item.kind === 'followup'
+                              ? 'text-success'
+                              : 'text-ink-faint'
+                        }`}
+                      />
+                    </button>
+                  </li>
                 )
               })}
-            </div>
+            </ul>
           )}
-        </ChartCard>
+        </Panel>
+
+        <div className="order-first flex lg:order-none lg:col-span-3">
+          <button
+            type="button"
+            onClick={() => setBriefingOpen(true)}
+            aria-haspopup="dialog"
+            className="group flex w-full items-center gap-3 rounded-xl bg-brand-500 px-4 py-4 text-left text-[#171717] transition hover:bg-brand-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 dark:bg-brand-400 dark:text-[#111111] dark:hover:bg-brand-300 dark:focus-visible:ring-offset-canvas"
+          >
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#171717]/10 dark:bg-[#111111]/15">
+              <ClipboardList size={18} aria-hidden="true" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-semibold">Daily briefing</span>
+              <span className="block truncate text-xs opacity-80">
+                Today&apos;s operational briefing ·{' '}
+                {briefingCount > 0
+                  ? `${briefingCount} item${briefingCount === 1 ? '' : 's'} need attention`
+                  : 'all clear'}
+              </span>
+            </span>
+            <ArrowRight
+              size={16}
+              aria-hidden="true"
+              className="shrink-0 transition-transform group-hover:translate-x-0.5"
+            />
+          </button>
+        </div>
       </div>
 
-      {/* Cash timing + demand to delivery */}
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-        <ChartCard title="Cash timing" sub={`${monthName} to date`} hud>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <div className="text-[10px] font-semibold uppercase tracking-wide text-gold-600 dark:text-gold-400">
-                Money in
-              </div>
-              <div className="mt-1 text-lg font-bold text-gold-600 dark:text-gold-400">{ghs(cashIn)}</div>
-              <div className="text-[11px] text-ink-faint">
-                {monthCash.filter((c) => c.kind.endsWith('_in')).length} entries
-              </div>
-            </div>
-            <div>
-              <div className="text-[10px] font-semibold uppercase tracking-wide text-brand-700 dark:text-brand-400">
-                Money out
-              </div>
-              <div className="mt-1 text-lg font-bold text-brand-700 dark:text-brand-400">{ghs(cashOut)}</div>
-              <div className="text-[11px] text-ink-faint">
-                {monthCash.filter((c) => c.kind.endsWith('_out')).length} entries
-              </div>
-            </div>
-          </div>
-          <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 border-t border-line pt-3 text-[11px] text-ink-faint">
-            <span>Net {ghs(cashIn - cashOut)}</span>
-            <span>Opening {ghs(data.meta.openingCashGhs)}</span>
-            <span>Available {ghs(cashAvailable)}</span>
-            <span>Receivable {ghs(receivable)}</span>
-          </div>
-          {data.cash.length === 0 && (
-            <p className="mt-3 text-[11px] text-ink-faint">No cash movements recorded yet.</p>
-          )}
-        </ChartCard>
+      {/* ===== Daily Briefing: a deterministic compile of today's records ===== */}
+      <Dialog open={briefingOpen} onOpenChange={setBriefingOpen}>
+        <DialogContent className="grid-cols-[minmax(0,1fr)] max-h-[85vh] max-w-lg overflow-x-hidden overflow-y-auto">
+          <DialogTitle className="text-base">Daily briefing</DialogTitle>
+          <DialogDescription>
+            Compiled from today&apos;s records · {fullDate} — a deterministic summary, nothing
+            generated.
+          </DialogDescription>
 
-        <ChartCard title="Demand to delivery" sub="Inquiries through to completed orders" hud>
-          <div className="grid grid-cols-4 gap-2 text-center">
-            {demandSteps.map((s) => (
-              <div key={s.label} className="rounded-lg bg-subtle p-3">
-                <div className="text-xl font-bold text-ink">{s.value}</div>
-                <div className="mt-0.5 text-[10px] font-medium uppercase tracking-wide text-ink-faint">
-                  {s.label}
-                </div>
-              </div>
-            ))}
+          <div className="space-y-4">
+            <section>
+              <h4 className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
+                Needs attention
+              </h4>
+              {briefingAttention.length === 0 ? (
+                <p className="mt-1.5 text-xs text-ink-faint">
+                  Nothing needs attention — no stale quotes, deposits or follow-ups.
+                </p>
+              ) : (
+                <ul className="mt-1.5 space-y-1">
+                  {briefingAttention.map((item) => {
+                    const Icon = item.icon
+                    return (
+                      <li key={item.key}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setBriefingOpen(false)
+                            onNavigate(item.target)
+                          }}
+                          className="flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition hover:bg-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
+                        >
+                          <span
+                            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${ATTENTION_TONE[item.tone]}`}
+                          >
+                            <Icon size={13} aria-hidden="true" />
+                          </span>
+                          <span className="min-w-0 flex-1 truncate text-xs text-ink">
+                            {item.text}
+                          </span>
+                          <span className="shrink-0 rounded-full bg-subtle px-1.5 py-0.5 text-[10px] font-medium text-ink-soft">
+                            {item.age}
+                          </span>
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+            </section>
+
+            <section>
+              <h4 className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
+                Due today
+              </h4>
+              {dueTodayItems.length === 0 ? (
+                <p className="mt-1.5 text-xs text-ink-faint">
+                  Nothing is scheduled for today.
+                </p>
+              ) : (
+                <ul className="mt-1.5 space-y-1">
+                  {dueTodayItems.map((item, i) => {
+                    const Icon = item.icon
+                    return (
+                      <li key={`${item.kind}-${i}`}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setBriefingOpen(false)
+                            onNavigate(item.target)
+                          }}
+                          className="flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition hover:bg-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
+                        >
+                          <Icon
+                            size={14}
+                            aria-hidden="true"
+                            className={`shrink-0 ${
+                              item.kind === 'delivery'
+                                ? 'text-brand-600 dark:text-brand-400'
+                                : item.kind === 'followup'
+                                  ? 'text-success'
+                                  : 'text-ink-faint'
+                            }`}
+                          />
+                          <span className="min-w-0 flex-1 truncate text-xs text-ink">
+                            {item.text}
+                          </span>
+                          <span
+                            className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${SCHEDULE_TONE[item.kind]}`}
+                          >
+                            {item.kind === 'delivery'
+                              ? 'Delivery'
+                              : item.kind === 'followup'
+                                ? 'Follow-up'
+                                : 'Inquiry'}
+                          </span>
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+            </section>
+
+            <section>
+              <h4 className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
+                Upcoming
+              </h4>
+              {briefingUpcoming.length === 0 ? (
+                <p className="mt-1.5 text-xs text-ink-faint">
+                  No dated commitments on the horizon.
+                </p>
+              ) : (
+                <ul className="mt-1.5 space-y-1">
+                  {briefingUpcoming.map((item, i) => {
+                    const Icon = item.icon
+                    const d = new Date(`${item.iso}T00:00:00`)
+                    return (
+                      <li key={`${item.iso}-${i}`}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setBriefingOpen(false)
+                            onNavigate(item.target)
+                          }}
+                          className="flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition hover:bg-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
+                        >
+                          <Icon
+                            size={14}
+                            aria-hidden="true"
+                            className="shrink-0 text-ink-faint"
+                          />
+                          <span className="min-w-0 flex-1 truncate text-xs text-ink">
+                            {item.text}
+                          </span>
+                          <span className="shrink-0 text-[10px] font-medium text-ink-soft">
+                            {d.toLocaleDateString('en-GB', {
+                              weekday: 'short',
+                              day: 'numeric',
+                              month: 'short',
+                            })}
+                          </span>
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+            </section>
           </div>
-          {data.inquiries.length === 0 && (
-            <p className="mt-3 text-[11px] text-ink-faint">No inquiries recorded yet.</p>
-          )}
-        </ChartCard>
-      </div>
+        </DialogContent>
+      </Dialog>
 
       {/* KPI drill-down */}
       {kpiDetail && (

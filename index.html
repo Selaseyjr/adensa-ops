@@ -8,8 +8,8 @@
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-    <link rel="mask-icon" href="/favicon.svg" color="#0B1424" />
-    <meta name="theme-color" content="#0B1424" />
+    <link rel="mask-icon" href="/favicon.svg" color="#171717" />
+    <meta name="theme-color" content="#FAFAF9" />
     <title>AdensaOps | Procurement Console</title>
     <script>
       // Apply the saved theme before first paint so dark mode never flashes.
@@ -21,7 +21,7 @@
           // Phone and tablet browsers tint the browser chrome with theme-color:
           // keep it on the active canvas so the chrome matches the page.
           var meta = document.querySelector('meta[name="theme-color"]');
-          if (meta) meta.setAttribute('content', dark ? '#0B1424' : '#F2F6FC');
+          if (meta) meta.setAttribute('content', dark ? '#111111' : '#FAFAF9');
         } catch (e) {
           /* storage unavailable — stay on light */
         }
@@ -41,7 +41,7 @@
         justify-content: center;
         gap: 28px;
         overflow: hidden;
-        background: #070d1c;
+        background: #111111;
         transition: opacity 600ms ease;
       }
       #adensa-splash.splash-hide {
@@ -61,7 +61,7 @@
         opacity: 0.5;
       }
       #adensa-splash::before {
-        background: radial-gradient(circle at 30% 35%, rgba(37, 99, 235, 0.28) 0%, transparent 45%);
+        background: radial-gradient(circle at 30% 35%, rgba(249, 115, 22, 0.24) 0%, transparent 45%);
         animation: splash-drift-a 16s ease-in-out infinite alternate;
       }
       #adensa-splash::after {
@@ -121,7 +121,7 @@
         width: 40%;
         height: 100%;
         border-radius: 999px;
-        background: linear-gradient(90deg, #2563eb, #c9a227);
+        background: linear-gradient(90deg, #f97316, #c9a227);
         animation: splash-load 1.4s ease-in-out infinite;
       }
       @keyframes splash-load {

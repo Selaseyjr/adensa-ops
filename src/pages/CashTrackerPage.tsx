@@ -341,8 +341,8 @@ export function CashTrackerPage({
 
   // Composition donuts — the deposit-vs-balance split the Day-5 note promised.
   const inSlices: DonutSlice[] = [
-    { name: 'Deposits', value: monthEntries.filter((c) => c.kind === 'deposit_in').reduce((s, c) => s + c.ghs, 0), color: '#2563eb' },
-    { name: 'Balances', value: monthEntries.filter((c) => c.kind === 'balance_in').reduce((s, c) => s + c.ghs, 0), color: '#93c5fd' },
+    { name: 'Deposits', value: monthEntries.filter((c) => c.kind === 'deposit_in').reduce((s, c) => s + c.ghs, 0), color: 'var(--color-stage-ordered)' },
+    { name: 'Balances', value: monthEntries.filter((c) => c.kind === 'balance_in').reduce((s, c) => s + c.ghs, 0), color: 'var(--color-stage-draft)' },
   ]
   const outSlices: DonutSlice[] = [
     { name: 'Suppliers', value: monthEntries.filter((c) => c.kind === 'supplier_out').reduce((s, c) => s + c.ghs, 0), color: '#334155' },
@@ -401,7 +401,7 @@ export function CashTrackerPage({
       {/* Flow: balance trajectory + the two money mixes */}
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         <ChartCard title="Balance trajectory" sub="Opening float through today">
-          <Sparkline data={spark} color="#2563eb" />
+          <Sparkline data={spark} color="var(--color-brand-500)" />
           <div className="mt-2 flex justify-between text-[11px] text-ink-faint">
             <span>{fmtDay(withBalance[0]?.entry.date ?? localDate())}</span>
             <span className="font-medium text-ink">{ghs(available)}</span>
