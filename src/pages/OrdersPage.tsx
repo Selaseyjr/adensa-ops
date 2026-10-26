@@ -732,7 +732,7 @@ export function OrdersPage({
               )}
               <button
                 type="button"
-                onClick={() => downloadInvoicePdf(open, data.customers)}
+                onClick={() => downloadInvoicePdf(open, data.customers, data.cash)}
                 className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-[11px] font-medium text-ink transition hover:bg-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300"
               >
                 <Download size={13} aria-hidden="true" /> Invoice PDF

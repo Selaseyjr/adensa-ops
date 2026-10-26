@@ -18,6 +18,10 @@ import {
 } from '../types'
 import { formatGhs } from './format'
 
+/** Printed on quotes and unpaid invoices: the company's payment rules. */
+export const PAYMENT_TERMS =
+  "The deposit confirms the order. The balance is due before offloading on delivery. Pay only into Adensa Supply & Logistics Ltd's MoMo merchant or bank account."
+
 export const DEPOSIT_RATE = 0.7
 export const ESTABLISHED_DEPOSIT_RATE = 0.5
 export const ESTABLISHED_MIN_PAID_ORDERS = 3

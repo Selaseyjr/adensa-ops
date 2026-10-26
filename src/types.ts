@@ -187,6 +187,12 @@ export type QuoteStatus = 'sent' | 'accepted' | 'declined' | 'expired';
 /** One priced row on a quote. unitCost is what we pay; unitPrice what the
     customer pays — the gap is the margin the ladder helps set. */
 export interface QuoteLine {
+  /** Catalogue product, when the line was picked from the catalogue. */
+  productId?: string;
+  /** Supplier whose price set the cost (best delivered at quote time). */
+  supplierId?: string;
+  /** Delivery / transport line rather than goods. */
+  transport?: boolean;
   description: string;
   qty: number;
   unitCostGhs?: number;
@@ -204,6 +210,8 @@ export interface Quote {
   /** Present on quotes created in the builder; seeded records may omit it. */
   lines?: QuoteLine[];
   validUntil?: string;
+  /** Deposit share that confirms the order (0.7 standard, 0.5 established client). */
+  depositRate?: number;
   notes?: string;
 }
 

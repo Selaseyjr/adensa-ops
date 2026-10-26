@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Check, Eye, FileText, Plus, Printer, Trash2, X } from 'lucide-react'
 import type { DataMode } from './lib/dataSource'
 import type { NotificationTarget } from './lib/notifications'
 import { ALERT_AMBER } from './lib/colors'
 import { KpiDetailModal } from './pages'
 import {
+  PRICE_STALE_DAYS,
   daysSince,
   quoteLineTotals,
   type Customer,
@@ -14,6 +16,10 @@ import {
   type QuoteStatus,
 } from './types'
 import { localDate, nextCustomerId } from './lib/localData'
+import type { Dataset } from './lib/dataSource'
+import { productLabel } from './lib/compare'
+import { autoFillCost, quoteTotals, transportLoads } from './lib/quote'
+import { DEPOSIT_RATE, PAYMENT_TERMS, QUOTE_VALIDITY_DAYS, requiredDeposit, requiredDepositRate } from './lib/rules'
 import { AdensaLogo } from './components/brand'
 import { formatCount, formatGhs } from './lib/format'
 
@@ -48,10 +54,19 @@ function QuoteStatusChip({ status }: { status: QuoteStatus }) {
 
 interface DraftLine {
   key: number
+  /** Catalogue product; empty for a custom line. */
+  productId: string
   description: string
   qty: string
   unitCost: string
   unitPrice: string
+  /** Supplier whose best delivered price filled the cost. */
+  supplierId?: string
+  supplierName?: string
+  transportGhs?: number
+  /** Result of the last auto-fill, for the hint under the line. */
+  fill?: 'priced' | 'stale' | 'none'
+  deliveredPerUnit?: number
 }
 
 const MARKUPS = [10, 15, 20, 25, 30]
@@ -61,6 +76,10 @@ function num(s: string): number {
   return Number.isFinite(v) && v >= 0 ? v : 0
 }
 
+const emptyLine = (key: number): DraftLine => ({ key, productId: '', description: '', qty: '1', unitCost: '', unitPrice: '' })
+
+type QuoteData = Pick<Dataset, 'customers' | 'products' | 'prices' | 'suppliers' | 'orders' | 'cash'>
+
 /* ------------------------------ New quote form ----------------------------- */
 
 function NewQuoteForm({
@@ -69,7 +88,7 @@ function NewQuoteForm({
   onClose,
   onCreate,
 }: {
-  data: { customers: Customer[] }
+  data: QuoteData
   mode: DataMode
   onClose: () => void
   onCreate: (q: Quote, newCustomer: Customer | null) => void
@@ -79,18 +98,37 @@ function NewQuoteForm({
   const [ncName, setNcName] = useState('')
   const [ncPhone, setNcPhone] = useState('')
   const [ncCity, setNcCity] = useState('')
-  const [lines, setLines] = useState<DraftLine[]>([
-    { key: 0, description: '', qty: '1', unitCost: '', unitPrice: '' },
-  ])
+  const [lines, setLines] = useState<DraftLine[]>([emptyLine(0)])
+  // Sell price per transport load, keyed by supplier (defaults to cost).
+  const [transportCharge, setTransportCharge] = useState<Record<string, string>>({})
   const [validUntil, setValidUntil] = useState(() => {
-    const d = new Date(Date.now() + 14 * 86_400_000)
+    const d = new Date(Date.now() + QUOTE_VALIDITY_DAYS * 86_400_000)
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   })
   const [notes, setNotes] = useState('')
   const [error, setError] = useState('')
 
-  function patchLine(key: number, patch: Partial<DraftLine>) {
-    setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)))
+  /** Re-run the best-delivered pick for a catalogue line (product or qty changed). */
+  function refill(l: DraftLine): DraftLine {
+    if (!l.productId) return l
+    const product = data.products.find((p) => p.id === l.productId)
+    const res = autoFillCost(l.productId, Math.max(1, num(l.qty)), data.prices, data.suppliers)
+    const base: DraftLine = { ...l, description: product ? productLabel(product) : l.description, fill: res.kind }
+    if (res.kind !== 'priced') {
+      return { ...base, supplierId: undefined, supplierName: undefined, transportGhs: undefined, deliveredPerUnit: undefined }
+    }
+    return {
+      ...base,
+      unitCost: String(res.pick.unitCostGhs),
+      supplierId: res.pick.supplierId,
+      supplierName: res.pick.supplierName,
+      transportGhs: res.pick.transportGhs,
+      deliveredPerUnit: res.pick.deliveredPerUnitGhs,
+    }
+  }
+
+  function patchLine(key: number, patch: Partial<DraftLine>, recompute = false) {
+    setLines((ls) => ls.map((l) => (l.key === key ? (recompute ? refill({ ...l, ...patch }) : { ...l, ...patch }) : l)))
   }
 
   /** Markup ladder: set every priced line's sell price from its cost. */
@@ -99,32 +137,42 @@ function NewQuoteForm({
       ls.map((l) => {
         const cost = num(l.unitCost)
         if (cost <= 0) return l
-        return { ...l, unitPrice: String(Math.round(cost * (1 + pct / 100))) }
+        return { ...l, unitPrice: String(Math.round(cost * (1 + pct / 100) * 100) / 100) }
       }),
     )
   }
 
-  const totals = useMemo(() => {
-    let cost = 0
-    let price = 0
-    let costedLines = 0
-    for (const l of lines) {
-      const qty = num(l.qty)
-      price += num(l.unitPrice) * qty
-      const c = num(l.unitCost)
-      if (c > 0) {
-        cost += c * qty
-        costedLines += 1
-      }
+  // Transport: one load per supplier the catalogue lines buy from.
+  const loads = transportLoads(lines)
+  const transportLines = loads.map((load) => {
+    const charge = transportCharge[load.supplierId]
+    return {
+      ...load,
+      chargeGhs: charge === undefined || charge === '' ? load.transportGhs : num(charge),
     }
-    const marginGhs = price - cost
-    const marginPct = cost > 0 ? Math.round((marginGhs / cost) * 100) : null
-    return { cost, price, marginGhs, marginPct, costedLines }
-  }, [lines])
+  })
+
+  const customer = data.customers.find((c) => c.id === customerId)
+  const depositRate = customer && !newCustomerMode ? requiredDepositRate(customer.id, data.orders, data.cash) : DEPOSIT_RATE
+
+  const totals = useMemo(
+    () =>
+      quoteTotals(
+        [
+          ...lines.map((l) => ({
+            qty: num(l.qty),
+            unitCostGhs: num(l.unitCost) > 0 ? num(l.unitCost) : undefined,
+            unitPriceGhs: num(l.unitPrice),
+          })),
+          ...transportLines.map((t) => ({ qty: 1, unitCostGhs: t.transportGhs || undefined, unitPriceGhs: t.chargeGhs })),
+        ],
+        depositRate,
+      ),
+    [lines, transportLines, depositRate],
+  )
 
   function submit(e: React.FormEvent) {
     e.preventDefault()
-    const customer = data.customers.find((c) => c.id === customerId)
     if (!newCustomerMode && !customer) {
       setError('Choose the customer this quote is for.')
       return
@@ -133,18 +181,34 @@ function NewQuoteForm({
       setError('Enter the customer name.')
       return
     }
-    const validLines = lines
+    if (lines.some((l) => l.productId && l.fill === 'stale' && num(l.unitCost) === 0)) {
+      setError('Re-check the stale supplier price, then enter the cost.')
+      return
+    }
+    const goods = lines
       .filter((l) => l.description.trim().length > 0 && num(l.qty) > 0 && num(l.unitPrice) > 0)
       .map<QuoteLine>((l) => ({
+        ...(l.productId ? { productId: l.productId } : {}),
+        ...(l.supplierId ? { supplierId: l.supplierId } : {}),
         description: l.description.trim(),
         qty: num(l.qty),
         ...(num(l.unitCost) > 0 ? { unitCostGhs: num(l.unitCost) } : {}),
         unitPriceGhs: num(l.unitPrice),
       }))
-    if (validLines.length === 0) {
+    if (goods.length === 0) {
       setError('Add at least one line with an item, quantity and price.')
       return
     }
+    const transport = transportLines
+      .filter((t) => t.chargeGhs > 0 || t.transportGhs > 0)
+      .map<QuoteLine>((t) => ({
+        transport: true,
+        supplierId: t.supplierId,
+        description: 'Delivery to site (one load)',
+        qty: 1,
+        ...(t.transportGhs > 0 ? { unitCostGhs: t.transportGhs } : {}),
+        unitPriceGhs: t.chargeGhs,
+      }))
     const newCustomer: Customer | null = newCustomerMode
       ? {
           id: nextCustomerId(data.customers, mode),
@@ -158,20 +222,22 @@ function NewQuoteForm({
     const quote: Quote = {
       id: '',
       customerId: newCustomer ? newCustomer.id : customer!.id,
-      valueGhs: totals.price,
+      valueGhs: totals.valueGhs,
       sentOn: localDate(),
       status: 'sent',
       orderIds: [],
-      lines: validLines,
+      lines: [...goods, ...transport],
       validUntil,
+      depositRate,
       ...(notes.trim() ? { notes: notes.trim() } : {}),
     }
     onCreate(quote, newCustomer)
   }
 
   const inputCls =
-    'w-full rounded-lg border border-line-strong bg-canvas px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-brand-300'
+    'w-full rounded-lg border border-line-strong bg-canvas px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-brand-400'
   const labelCls = 'block text-[11px] font-medium text-ink-soft'
+  const pct = (n: number | null) => (n === null ? 'N/A' : `${Math.round(n * 100)}%`)
 
   return (
     <form onSubmit={submit} className="space-y-5">
@@ -183,14 +249,15 @@ function NewQuoteForm({
             <button
               type="button"
               onClick={() => setNewCustomerMode((v) => !v)}
-              className="text-[11px] font-medium text-brand-600 hover:underline dark:text-brand-400"
+              className="text-[11px] font-medium text-brand-600 hover:underline"
             >
-              {newCustomerMode ? 'Pick an existing customer' : '＋ New customer'}
+              {newCustomerMode ? 'Pick an existing customer' : 'New customer'}
             </button>
           </div>
           {!newCustomerMode && (
             <select
               value={customerId}
+              aria-label="Customer"
               onChange={(e) => {
                 setCustomerId(e.target.value)
                 setError('')
@@ -213,69 +280,64 @@ function NewQuoteForm({
             <label className={labelCls} htmlFor="nq-name">
               Name
             </label>
-            <input
-              id="nq-name"
-              value={ncName}
-              onChange={(e) => setNcName(e.target.value)}
-              placeholder="Customer or company name"
-              className={`${inputCls} mt-1.5`}
-            />
+            <input id="nq-name" value={ncName} onChange={(e) => setNcName(e.target.value)} placeholder="Customer or company name" className={`${inputCls} mt-1.5`} />
           </div>
           <div>
             <label className={labelCls} htmlFor="nq-phone">
               Phone
             </label>
-            <input
-              id="nq-phone"
-              value={ncPhone}
-              onChange={(e) => setNcPhone(e.target.value)}
-              placeholder="Optional"
-              className={`${inputCls} mt-1.5`}
-            />
+            <input id="nq-phone" value={ncPhone} onChange={(e) => setNcPhone(e.target.value)} placeholder="Optional" className={`${inputCls} mt-1.5`} />
           </div>
           <div>
             <label className={labelCls} htmlFor="nq-city">
               City / area
             </label>
-            <input
-              id="nq-city"
-              value={ncCity}
-              onChange={(e) => setNcCity(e.target.value)}
-              placeholder="e.g. Tema"
-              className={`${inputCls} mt-1.5`}
-            />
+            <input id="nq-city" value={ncCity} onChange={(e) => setNcCity(e.target.value)} placeholder="e.g. Tema" className={`${inputCls} mt-1.5`} />
           </div>
         </div>
       )}
 
       {/* Markup ladder */}
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[11px] font-medium text-ink-soft">Markup ladder:</span>
+        <span className="text-[11px] font-medium text-ink-soft">Markup on cost:</span>
         {MARKUPS.map((p) => (
           <button
             key={p}
             type="button"
             onClick={() => applyMarkup(p)}
-            className="rounded-full border border-line-strong px-2.5 py-1 text-[11px] font-medium text-ink-soft transition hover:border-brand-400 hover:text-brand-600 dark:hover:text-brand-400"
+            className="rounded-full border border-line-strong px-2.5 py-1 text-[11px] font-medium text-ink-soft transition hover:border-brand-400 hover:text-brand-600"
             title={`Set every line with a cost to cost +${p}%`}
           >
             +{p}%
           </button>
         ))}
-        <span className="text-[10px] text-ink-faint">applies to lines with a cost</span>
       </div>
 
       {/* Lines */}
       <div className="space-y-3">
         {lines.map((l, i) => {
           const qty = num(l.qty)
+          const product = data.products.find((p) => p.id === l.productId)
           const margin =
             num(l.unitCost) > 0 && num(l.unitPrice) > 0
-              ? Math.round(((num(l.unitPrice) - num(l.unitCost)) / num(l.unitCost)) * 100)
+              ? Math.round(((num(l.unitPrice) - num(l.unitCost)) / num(l.unitPrice)) * 100)
               : null
           return (
             <div key={l.key} className="rounded-lg border border-line bg-subtle p-3">
               <div className="flex items-start gap-2">
+                <select
+                  value={l.productId}
+                  aria-label={`Line ${i + 1} catalogue product`}
+                  onChange={(e) => patchLine(l.key, { productId: e.target.value, ...(e.target.value ? {} : { fill: undefined }) }, true)}
+                  className={`${inputCls} max-w-[46%] shrink-0`}
+                >
+                  <option value="">Custom item</option>
+                  {data.products.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {productLabel(p)}
+                    </option>
+                  ))}
+                </select>
                 <input
                   value={l.description}
                   onChange={(e) => patchLine(l.key, { description: e.target.value })}
@@ -295,19 +357,19 @@ function NewQuoteForm({
               <div className="mt-2 grid grid-cols-3 gap-2">
                 <div>
                   <label className={labelCls} htmlFor={`qty-${l.key}`}>
-                    Qty
+                    Qty{product ? ` (${product.unit}s)` : ''}
                   </label>
                   <input
                     id={`qty-${l.key}`}
                     value={l.qty}
                     inputMode="decimal"
-                    onChange={(e) => patchLine(l.key, { qty: e.target.value })}
+                    onChange={(e) => patchLine(l.key, { qty: e.target.value }, true)}
                     className={`${inputCls} mt-1`}
                   />
                 </div>
                 <div>
                   <label className={labelCls} htmlFor={`cost-${l.key}`}>
-                    Our cost (optional)
+                    Our cost per unit
                   </label>
                   <input
                     id={`cost-${l.key}`}
@@ -320,7 +382,7 @@ function NewQuoteForm({
                 </div>
                 <div>
                   <label className={labelCls} htmlFor={`price-${l.key}`}>
-                    Sell price
+                    Sell price per unit
                   </label>
                   <input
                     id={`price-${l.key}`}
@@ -332,17 +394,23 @@ function NewQuoteForm({
                   />
                 </div>
               </div>
-              <div className="mt-1.5 flex items-center justify-between text-[11px]">
+              <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2 text-[11px]">
                 <span className="text-ink-faint">
-                  Line total {ghs(num(l.unitPrice) * qty)}
+                  {l.fill === 'priced' && l.supplierName
+                    ? `Best delivered: ${l.supplierName} · ${ghs(num(l.unitCost))} + ${ghs(l.transportGhs ?? 0)} per load (${ghs(l.deliveredPerUnit ?? 0)} per unit delivered)`
+                    : l.fill === 'stale'
+                      ? null
+                      : l.fill === 'none'
+                        ? 'No supplier quote for this product yet.'
+                        : `Line total ${ghs(num(l.unitPrice) * qty)}`}
+                  {l.fill === 'stale' && (
+                    <span className="rounded-full bg-warning-soft px-2 py-0.5 font-medium text-warning">
+                      Stale price: supplier quotes are older than {PRICE_STALE_DAYS} days. Re-check before quoting.
+                    </span>
+                  )}
                 </span>
                 {margin !== null && (
-                  <span
-                    className={`font-medium ${margin < 0 ? 'text-danger' : 'text-brand-600 dark:text-brand-400'}`}
-                  >
-                    {margin < 0 ? '' : '+'}
-                    {margin}% margin
-                  </span>
+                  <span className={`font-medium ${margin < 0 ? 'text-danger' : 'text-success'}`}>{margin}% margin</span>
                 )}
               </div>
             </div>
@@ -351,41 +419,68 @@ function NewQuoteForm({
       </div>
       <button
         type="button"
-        onClick={() =>
-          setLines((ls) => [
-            ...ls,
-            { key: Math.max(...ls.map((l) => l.key)) + 1, description: '', qty: '1', unitCost: '', unitPrice: '' },
-          ])
-        }
+        onClick={() => setLines((ls) => [...ls, emptyLine(Math.max(...ls.map((l) => l.key)) + 1)])}
         className="inline-flex items-center gap-1.5 rounded-lg border border-line-strong px-3 py-1.5 text-xs font-medium text-ink-soft transition hover:bg-subtle"
       >
         <Plus size={13} />
         Add line
       </button>
 
-      {/* Totals + meta */}
-      <div className="grid grid-cols-2 gap-3 rounded-lg border border-line bg-subtle px-4 py-3 text-sm sm:grid-cols-4">
+      {/* Transport: one load per supplier */}
+      {transportLines.length > 0 && (
+        <div className="rounded-lg border border-line p-3">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-ink-faint">Transport</div>
+          <ul className="mt-2 space-y-2">
+            {transportLines.map((t) => (
+              <li key={t.supplierId} className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                <span className="min-w-0 text-ink">
+                  Delivery to site · {t.supplierName}
+                  <span className="ml-1.5 text-xs text-ink-faint">1 load, cost {ghs(t.transportGhs)}</span>
+                </span>
+                <label className="flex items-center gap-2 text-[11px] text-ink-soft">
+                  Charge
+                  <input
+                    value={transportCharge[t.supplierId] ?? String(t.transportGhs)}
+                    inputMode="decimal"
+                    aria-label={`Transport charge for ${t.supplierName}`}
+                    onChange={(e) => setTransportCharge((c) => ({ ...c, [t.supplierId]: e.target.value }))}
+                    className={`${inputCls} num w-28 py-1.5`}
+                  />
+                </label>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Totals: margins include transport; deposit and balance per the rules */}
+      <div className="grid grid-cols-2 gap-x-3 gap-y-3 rounded-lg border border-line bg-subtle px-4 py-3 text-sm sm:grid-cols-3">
         <div>
-          <div className="text-[10px] font-semibold uppercase tracking-wide text-ink-faint">Cost</div>
-          <div className="mt-0.5 font-semibold text-ink">
-            {totals.costedLines > 0 ? ghs(totals.cost) : 'Not captured'}
-          </div>
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-ink-faint">Cost incl. transport</div>
+          <div className="num mt-0.5 font-semibold text-ink">{totals.costedLines > 0 ? ghs(totals.costGhs) : 'N/A'}</div>
         </div>
         <div>
           <div className="text-[10px] font-semibold uppercase tracking-wide text-ink-faint">Quote value</div>
-          <div className="mt-0.5 font-bold text-ink">{ghs(totals.price)}</div>
+          <div className="num mt-0.5 font-bold text-ink">{ghs(totals.valueGhs)}</div>
         </div>
         <div>
           <div className="text-[10px] font-semibold uppercase tracking-wide text-ink-faint">Gross margin</div>
-          <div className={`mt-0.5 font-semibold ${totals.marginGhs < 0 ? 'text-danger' : 'text-ink'}`}>
-            {totals.costedLines > 0 ? ghs(totals.marginGhs) : '-'}
+          <div className={`num mt-0.5 font-semibold ${totals.marginGhs < 0 ? 'text-danger' : 'text-ink'}`}>
+            {totals.costedLines > 0 ? `${ghs(totals.marginGhs)} · ${pct(totals.grossMarginPct)}` : 'N/A'}
           </div>
         </div>
         <div>
-          <div className="text-[10px] font-semibold uppercase tracking-wide text-ink-faint">Margin %</div>
-          <div className={`mt-0.5 font-semibold ${totals.marginGhs < 0 ? 'text-danger' : 'text-brand-600 dark:text-brand-400'}`}>
-            {totals.marginPct !== null ? `${totals.marginPct}%` : '-'}
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-ink-faint">
+            Deposit to confirm ({Math.round(totals.depositRate * 100)}%)
           </div>
+          <div className="num mt-0.5 font-semibold text-ink">{ghs(totals.depositGhs)}</div>
+        </div>
+        <div>
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-ink-faint">Balance before offloading</div>
+          <div className="num mt-0.5 font-semibold text-ink">{ghs(totals.balanceGhs)}</div>
+        </div>
+        <div className="col-span-2 self-center text-[11px] text-ink-faint sm:col-span-1">
+          {totals.depositRate < DEPOSIT_RATE ? 'Established client: 3+ fully paid orders.' : 'Standard terms.'}
         </div>
       </div>
 
@@ -394,13 +489,7 @@ function NewQuoteForm({
           <label className={labelCls} htmlFor="nq-valid">
             Valid until
           </label>
-          <input
-            id="nq-valid"
-            type="date"
-            value={validUntil}
-            onChange={(e) => setValidUntil(e.target.value)}
-            className={`${inputCls} mt-1.5`}
-          />
+          <input id="nq-valid" type="date" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} className={`${inputCls} mt-1.5`} />
         </div>
         <div>
           <label className={labelCls} htmlFor="nq-notes">
@@ -426,10 +515,7 @@ function NewQuoteForm({
         >
           Cancel
         </button>
-        <button
-          type="submit"
-          className="rounded-lg bg-primary px-4 py-2 text-xs font-medium text-on-primary transition hover:bg-primary-hover"
-        >
+        <button type="submit" className="rounded-lg bg-primary px-4 py-2 text-xs font-medium text-on-primary transition hover:bg-primary-hover">
           Save quote
         </button>
       </div>
@@ -539,6 +625,28 @@ function QuoteSheet({
             </tfoot>
           </table>
 
+          {/* Payment terms: deposit confirms, balance before offloading */}
+          {(() => {
+            const total = quote.lines?.length ? quote.lines.reduce((s, l) => s + l.unitPriceGhs * l.qty, 0) : quote.valueGhs
+            const rate = quote.depositRate ?? DEPOSIT_RATE
+            const deposit = Math.min(total, requiredDeposit(total, rate))
+            return (
+              <div className="mt-5 grid grid-cols-2 gap-3 rounded-lg border border-[#e8e5dd] p-4 text-sm">
+                <div>
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-[#566072]">
+                    Deposit to confirm ({Math.round(rate * 100)}%)
+                  </div>
+                  <div className="mt-0.5 font-semibold tabular-nums">{ghs(deposit)}</div>
+                </div>
+                <div>
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-[#566072]">Balance before offloading</div>
+                  <div className="mt-0.5 font-semibold tabular-nums">{ghs(total - deposit)}</div>
+                </div>
+                <p className="col-span-2 text-[11px] leading-relaxed text-[#3d4a5c]">{PAYMENT_TERMS}</p>
+              </div>
+            )
+          })()}
+
           {quote.notes && <p className="mt-5 text-sm text-[#3d4a5c]">{quote.notes}</p>}
           <p className="mt-8 border-t border-[#e8e5dd] pt-4 text-[11px] text-[#566072]">
             Prices are stated in Ghana cedis and are valid until the date shown above. Delivery timelines
@@ -568,7 +676,7 @@ export function QuoteBuilderPage({
   onCreateQuote,
   onSetStatus,
 }: {
-  data: { customers: Customer[]; quotes: Quote[]; orders: Order[] }
+  data: QuoteData & { quotes: Quote[]; orders: Order[] }
   mode: DataMode
   onNavigate: (target: NotificationTarget) => void
   /** Open the order detail popup on the Orders page for a reviewed order. */
@@ -577,7 +685,20 @@ export function QuoteBuilderPage({
   onSetStatus: (quoteId: string, status: QuoteStatus) => void
 }) {
   const [filter, setFilter] = useState<'all' | QuoteStatus>('all')
-  const [creating, setCreating] = useState(false)
+  // ?new=1 (the top bar's New quote button) opens the form, also when the
+  // quotes page is already showing; closing the form clears the flag.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const creating = searchParams.get('new') === '1'
+  const setCreating = (open: boolean) =>
+    setSearchParams(
+      (p) => {
+        const next = new URLSearchParams(p)
+        if (open) next.set('new', '1')
+        else next.delete('new')
+        return next
+      },
+      { replace: !open },
+    )
   const [sheetQuoteId, setSheetQuoteId] = useState<string | null>(null)
 
   const rows = useMemo(() => {
@@ -604,10 +725,8 @@ export function QuoteBuilderPage({
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-bold text-ink">Quote builder</h2>
-          <p className="mt-0.5 text-sm text-ink-soft">
-            Price with the margin ladder, print or share, track the answer.
-          </p>
+          <h2 className="text-lg font-semibold text-ink">Quotes</h2>
+          <p className="mt-0.5 text-sm text-ink-faint">Catalogue cost, transport and deposit terms on every quote.</p>
         </div>
         <button
           onClick={() => setCreating(true)}
@@ -805,9 +924,9 @@ export function QuoteBuilderPage({
       )}
 
       {creating && (
-        <KpiDetailModal title="New quote" sub="Price it with the margin ladder, then print or share" onClose={() => setCreating(false)}>
+        <KpiDetailModal title="New quote" sub="Catalogue cost, transport and deposit terms" onClose={() => setCreating(false)}>
           <NewQuoteForm
-            data={{ customers: data.customers }}
+            data={data}
             mode={mode}
             onClose={() => setCreating(false)}
             onCreate={(q, newCustomer) => {

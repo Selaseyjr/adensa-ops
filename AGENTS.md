@@ -104,6 +104,17 @@
   `deposit_in` cash entries). Every later payment is a `balance_in` cash
   entry only. Never add balance payments to `depositGhs`.
 
+## Quotes
+
+- Catalogue lines take their cost from `autoFillCost` (`src/lib/quote.ts`),
+  the same best-delivered pick as Compare prices. Stale prices never
+  auto-fill: the operator re-checks first.
+- Transport is its own line: one load per supplier used, cost as quoted.
+- Every quote and unpaid invoice shows the deposit that confirms it (70%, 50%
+  for established clients), the balance due before offloading and
+  `PAYMENT_TERMS` (pay only into the company MoMo merchant or bank account).
+  Never print account numbers that are not in the operator's records.
+
 ## Metrics
 
 - Every figure that appears on more than one page comes from
