@@ -1,7 +1,8 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { demo } from '../data/demo'
-import { real } from '../data/real'
+// @ts-expect-error plain ESM server module, no type declarations
+import real from '../../server/real-dataset.js'
 import { CATEGORIES } from './shared'
 import { SuppliersPage, sourceUrl } from './SuppliersPage'
 import type { Supplier } from '../types'
@@ -28,7 +29,7 @@ describe('Suppliers page', () => {
   })
 
   it('every supplier category in both datasets is a known category key', () => {
-    for (const s of [...demo.suppliers, ...real.suppliers]) expect(CATEGORIES).toContain(s.category)
+    for (const s of [...demo.suppliers, ...(real.suppliers as Supplier[])]) expect(CATEGORIES).toContain(s.category)
   })
 
   it('links only real URLs as sources', () => {

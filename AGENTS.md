@@ -134,5 +134,12 @@
   example per flag (guarded by `src/data/demo.test.ts`). The simulation
   follows the rules too.
 - Real mode NEVER shows simulated data anywhere, including notifications.
-- Real mode is PIN-gated (client-side speed bump). The PIN is not stored in
-  this repository - ask the operator. Never write a PIN or seed into source.
+- Real mode is PIN-gated and verified by the worker (`POST /api/session`), which
+  issues a signed session token. The real dataset lives in `server/` and is
+  served by `GET /api/real-dataset`; never import it (or `server/pin-hash.js`)
+  from `src/`. `npm run build` fails if real data appears in `dist/`.
+- The PIN itself is not stored anywhere in this repository; ask the operator.
+  Never write a PIN into source (only its PBKDF2 hash, via `npm run set-pin`
+  or the `REAL_PIN_*` worker secrets).
+- The browser reaches the API same-origin (`/api`): Vercel rewrites it to the
+  worker. Keep `adensaops.com` in the worker's CORS allowlist.

@@ -31,14 +31,13 @@ import {
   type LocalRecords,
   type OrderOverride,
 } from './lib/localData'
-import { isRealUnlocked, unlockReal, verifyPin } from './lib/realAccess'
+import { fetchRealDataset, isRealUnlocked, lockReal, unlockReal } from './lib/realAccess'
 import { createPushQueue, hydrateRecords } from './lib/remote'
 import { applyTheme, getTheme, persistTheme, ThemeContext, type Theme } from './lib/theme'
 import { useNotifications } from './lib/notifications'
 import { EMPTY_SIM, mergeSim, useSimulation } from './lib/simulation'
 import { demo } from './data/demo'
 import { demoNotifications } from './data/demoNotifications'
-import { real } from './data/real'
 import { daysSince, type CashEntry, type Customer, type Order, type Quote, type QuoteStatus } from './types'
 import { AdensaLogo } from './components/brand'
 import { NotificationsBell } from './components/NotificationsBell'
@@ -107,6 +106,19 @@ const NAV: (NavItem & { group: string })[] = NAV_GROUPS.flatMap((g) =>
   g.items.map((item) => ({ ...item, group: g.label })),
 )
 
+/** Real mode before its dataset arrives: empty, never simulated. */
+const EMPTY_REAL: Dataset = {
+  suppliers: [],
+  products: [],
+  prices: [],
+  customers: [],
+  orders: [],
+  inquiries: [],
+  quotes: [],
+  cash: [],
+  meta: { month: localDate().slice(0, 7), revenueTargetGhs: 0, openingCashGhs: 0 },
+}
+
 /** Stored "real" only counts if this tab has passed the PIN gate. */
 function initialMode(): DataMode {
   const stored = getMode()
@@ -144,7 +156,10 @@ function AppInner() {
   const [pinVisible, setPinVisible] = useState(false)
   const pinInputRef = useRef<HTMLInputElement>(null)
 
-  const base: Dataset = mode === 'demo' ? demo : real
+  // Real data never ships in the bundle: it is fetched from the API with the
+  // PIN session token, and Real mode renders empty until it arrives.
+  const [realData, setRealData] = useState<Dataset | null>(null)
+  const base: Dataset = mode === 'demo' ? demo : (realData ?? EMPTY_REAL)
 
   // Records created in the UI live in the browser (per mode) and layer over
   // the seeded dataset. Local-first sync: render from localStorage at once,
@@ -321,21 +336,49 @@ function AppInner() {
     setPinError('')
   }
 
+  // Real dataset: load once per unlocked session; a rejected or expired
+  // session drops back to Demo instead of showing a half-empty Real mode.
+  useEffect(() => {
+    if (mode !== 'real' || realData) return
+    let cancelled = false
+    void fetchRealDataset().then((dataset) => {
+      if (cancelled) return
+      if (dataset) {
+        setRealData(dataset)
+      } else {
+        if (!isRealUnlocked()) lockReal()
+        persistMode('demo')
+        setModeState('demo')
+        toast.info('Real records could not be loaded. Showing demo data.')
+      }
+    })
+    return () => {
+      cancelled = true
+    }
+    // toast is stable for the provider's lifetime
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, realData])
+
   async function submitPin(e: React.FormEvent) {
     e.preventDefault()
     if (pinChecking) return
     setPinChecking(true)
     setPinError('')
-    const ok = await verifyPin(pinValue)
+    const result = await unlockReal(pinValue)
     setPinChecking(false)
-    if (ok) {
-      unlockReal()
+    if (result === 'ok') {
       persistMode('real')
       setModeState('real')
       closePin()
       toast.info('Real records unlocked for this session.')
     } else {
-      setPinError('Incorrect PIN. Try again.')
+      setPinError(
+        result === 'locked'
+          ? 'Too many attempts. Try again in a minute.'
+          : result === 'unavailable'
+            ? 'Real records are unavailable right now.'
+            : 'Incorrect PIN. Try again.',
+      )
       pinInputRef.current?.select()
     }
   }
