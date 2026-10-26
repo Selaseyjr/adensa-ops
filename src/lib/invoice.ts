@@ -9,6 +9,7 @@
 
 import type { jsPDF } from 'jspdf'
 import type { CashEntry, CashKind, Customer, Order } from '../types'
+import { formatGhs } from './format'
 
 /* ── print-safe palette (mirrors the quote sheet) ─────────────────────── */
 const INK: [number, number, number] = [14, 27, 44] // #0e1b2c navy
@@ -21,8 +22,8 @@ const GOLD: [number, number, number] = [212, 162, 30] // #d4a21e, the mark's sun
 const PAID: [number, number, number] = [15, 110, 70] // green
 const DUE: [number, number, number] = [180, 83, 9] // amber
 
-/** Same money format as the app's columns — GH¢ tabular figures. */
-export const money = (n: number): string => `GH¢${n.toLocaleString('en-GH')}`
+/** Same money format as every screen (lib/format.ts). */
+export const money = formatGhs
 
 /** Local calendar date, matching localDate() without pulling in the datasets. */
 function todayIso(): string {

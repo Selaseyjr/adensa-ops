@@ -11,6 +11,7 @@ import {
   YAxis,
 } from 'recharts'
 import { CHART_AXIS, CHART_GRID, CHART_LABEL, CHART_TOOLTIP_STYLE } from '../lib/colors'
+import { formatCount } from '../lib/format'
 
 /**
  * White (surface) card shell used around every chart and table.
@@ -58,10 +59,17 @@ export function DonutChart({
   data,
   height = 180,
   centerLabel,
+  format = formatCount,
+  centerFormat,
 }: {
   data: DonutSlice[]
   height?: number
+  /** Small caption under the total (e.g. "prices"). */
   centerLabel?: string
+  /** How values print in the centre, legend and tooltip (counts by default). */
+  format?: (n: number) => string
+  /** Shorter form for the centre when values are wide (money). */
+  centerFormat?: (n: number) => string
 }) {
   const total = data.reduce((sum, d) => sum + d.value, 0)
   const visible = data.filter((d) => d.value > 0)
@@ -92,11 +100,11 @@ export function DonutChart({
                 <Cell key={d.name} fill={d.color} />
               ))}
             </Pie>
-            <Tooltip contentStyle={CHART_TOOLTIP_STYLE} />
+            <Tooltip contentStyle={CHART_TOOLTIP_STYLE} formatter={(v, name) => [format(Number(v)), name]} />
           </PieChart>
         </ResponsiveContainer>
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-          <div className="text-2xl font-bold text-ink">{total}</div>
+          <div className="num text-xl font-semibold text-ink">{(centerFormat ?? format)(total)}</div>
           {centerLabel && (
             <div className="text-[10px] font-medium uppercase tracking-wide text-ink-faint">
               {centerLabel}
@@ -114,8 +122,8 @@ export function DonutChart({
               />
               {d.name}
             </span>
-            <span className="shrink-0 font-semibold text-ink">
-              {d.value}
+            <span className="num shrink-0 font-semibold text-ink">
+              {format(d.value)}
               <span className="ml-1 font-normal text-ink-faint">
                 {Math.round((d.value / total) * 100)}%
               </span>

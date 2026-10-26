@@ -23,6 +23,7 @@ import type { Dataset } from './dataSource'
 import { mergeDataset, nextCashId, nextOrderId, type LocalRecords, type OrderOverride } from './localData'
 import type { AppNotification } from './notifications'
 import { requiredDeposit, requiredDepositRate } from './rules'
+import { formatGhs } from './format'
 
 /** A live notification: same as AppNotification but timestamped so it ages. */
 export interface SimNotification extends Omit<AppNotification, 'minutesAgo'> {
@@ -164,7 +165,7 @@ export function pickSimEvent(data: Dataset, rng: () => number = Math.random): Si
         notification: notif(
           'supplier',
           'Supplier payment',
-          `GH\u00a2${amount.toLocaleString('en-GH')} paid to ${supplier.name} for stock.`,
+          `${formatGhs(amount)} paid to ${supplier.name} for stock.`,
           'cash',
         ),
       }
@@ -181,7 +182,7 @@ export function pickSimEvent(data: Dataset, rng: () => number = Math.random): Si
     return {
       type: 'cashOut',
       cash: [entry],
-      notification: notif('expense', 'Expense recorded', `GH\u00a2${amount.toLocaleString('en-GH')} recorded for ${label.toLowerCase()}.`, 'cash'),
+      notification: notif('expense', 'Expense recorded', `${formatGhs(amount)} recorded for ${label.toLowerCase()}.`, 'cash'),
     }
   }
 
@@ -202,7 +203,7 @@ export function pickSimEvent(data: Dataset, rng: () => number = Math.random): Si
       notification: notif(
         'price',
         'Supplier price updated',
-        `${describeProduct(product)} repriced at GH\u00a2${next}${unitWord} by ${supplier?.name ?? 'supplier'}, ${up ? 'up' : 'down'} from GH\u00a2${price.ghs}.`,
+        `${describeProduct(product)} repriced at ${formatGhs(next)}${unitWord} by ${supplier?.name ?? 'supplier'}, ${up ? 'up' : 'down'} from ${formatGhs(price.ghs)}.`,
         'compare',
       ),
     }
@@ -297,7 +298,7 @@ export function pickSimEvent(data: Dataset, rng: () => number = Math.random): Si
       notification: notif(
         'payment',
         'Payment received',
-        `GH\u00a2${amount.toLocaleString('en-GH')} deposit received for ${order.id} (${customer?.name ?? 'customer'}).`,
+        `${formatGhs(amount)} deposit received for ${order.id} (${customer?.name ?? 'customer'}).`,
         'cash',
       ),
     }
@@ -338,8 +339,8 @@ export function pickSimEvent(data: Dataset, rng: () => number = Math.random): Si
         'payment',
         'Payment received',
         willSettle
-          ? `GH¢${amount.toLocaleString('en-GH')} final balance received. Order ${order.id} fully settled.`
-          : `GH¢${amount.toLocaleString('en-GH')} balance received for ${order.id} (${customer?.name ?? 'customer'}).`,
+          ? `${formatGhs(amount)} final balance received. Order ${order.id} fully settled.`
+          : `${formatGhs(amount)} balance received for ${order.id} (${customer?.name ?? 'customer'}).`,
         'cash',
       ),
     }

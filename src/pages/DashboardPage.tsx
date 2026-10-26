@@ -21,6 +21,7 @@ import type { Dataset } from '../lib/dataSource'
 import type { NotificationTarget } from '../lib/notifications'
 import { CHART_AXIS, CHART_GRID, CHART_TOOLTIP_STYLE } from '../lib/colors'
 import { EmptyState } from '../components/states'
+import { formatGhsCompact } from '../lib/format'
 import { cashReceived, orderFlags, quoteFlags } from '../lib/rules'
 import { cashOnHandAt, computeMetrics, inMotionAt, isCashIn, isoDay, stillToCollectAt } from '../lib/metrics'
 import {
@@ -537,11 +538,11 @@ export function DashboardPage({
                 <CartesianGrid vertical={false} stroke={CHART_GRID} />
                 <XAxis dataKey="week" tick={{ fontSize: 11, fill: CHART_AXIS }} axisLine={false} tickLine={false} />
                 <YAxis
-                  width={48}
+                  width={64}
                   tick={{ fontSize: 11, fill: CHART_AXIS }}
                   axisLine={false}
                   tickLine={false}
-                  tickFormatter={(v: number) => (v >= 1000 ? `${Math.round(v / 1000)}k` : String(v))}
+                  tickFormatter={(v: number) => formatGhsCompact(v)}
                 />
                 <Tooltip
                   cursor={{ fill: 'var(--color-subtle)' }}

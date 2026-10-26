@@ -23,6 +23,7 @@ import {
   type OrderStage,
   type ProspectStatus,
 } from '../types'
+import { formatGhs } from '../lib/format'
 
 export const CATEGORIES: Category[] = ['cement', 'plumbing', 'electrical', 'safety', 'tools']
 export const STATUSES: ProspectStatus[] = ['identified', 'contacted', 'vetted']
@@ -30,9 +31,8 @@ export const STATUSES: ProspectStatus[] = ['identified', 'contacted', 'vetted']
 /** Minimum table width — inside overflow-x-auto so the PAGE never scrolls sideways. */
 export const TABLE_MIN_W = 'min-w-[680px]'
 
-export function ghs(n: number): string {
-  return `GH¢${n.toLocaleString('en-GH')}`
-}
+/** Cedi amounts: the one shared formatter (lib/format.ts). */
+export const ghs = formatGhs
 
 export function StatusChip({ status }: { status: ProspectStatus }) {
   const color = STATUS_COLORS[status]

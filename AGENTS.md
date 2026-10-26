@@ -33,6 +33,11 @@
   telling users how to use a feature. The Demo/Real toggle already communicates
   the data mode; do not add mode banners.
 - Keep on-screen text short. Placeholders in tables are `N/A` (never a dash).
+- Money is always printed with `formatGhs` (`src/lib/format.ts`, re-exported as
+  `ghs`): screens, charts, PDFs, toasts and notifications. Never build
+  `GH¢${n.toLocaleString()}` by hand. Chart axes may use `formatGhsCompact`.
+- A supplier `source` is a link only if it is an http(s) URL; otherwise it is
+  plain text.
 - **Slogan:** **"Your project. Our procurement."** on every product, business
   and client-facing surface (AdensaOps, splash, quotes, decks). The older
   "The Night Never Falls." line is retired from product surfaces.

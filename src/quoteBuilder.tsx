@@ -15,10 +15,9 @@ import {
 } from './types'
 import { localDate, nextCustomerId } from './lib/localData'
 import { AdensaLogo } from './components/brand'
+import { formatCount, formatGhs } from './lib/format'
 
-function ghs(n: number): string {
-  return `GH¢${n.toLocaleString('en-GH')}`
-}
+const ghs = formatGhs
 
 function fmtLong(iso: string): string {
   return new Date(`${iso}T00:00:00`).toLocaleDateString('en-GB', {
@@ -510,7 +509,7 @@ function QuoteSheet({
               {quote.lines?.map((l, i) => (
                 <tr key={i} className="border-b border-[#e8e5dd]">
                   <td className="py-2.5 pr-3">{l.description}</td>
-                  <td className="py-2.5 text-right tabular-nums">{l.qty.toLocaleString('en-GH')}</td>
+                  <td className="py-2.5 text-right tabular-nums">{formatCount(l.qty)}</td>
                   <td className="py-2.5 text-right tabular-nums">{ghs(l.unitPriceGhs)}</td>
                   <td className="py-2.5 text-right tabular-nums">{ghs(l.unitPriceGhs * l.qty)}</td>
                 </tr>
