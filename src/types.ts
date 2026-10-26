@@ -1,4 +1,4 @@
-// Adensa Ops — core data schema (authoritative contract).
+// AdensaOps — core data schema (authoritative contract).
 // Data files (src/data/*) and all UI build against this file.
 
 export type Category =

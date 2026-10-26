@@ -6,6 +6,13 @@
 
 import { expect, test, type Page } from '@playwright/test'
 
+// The About panel opens on a first visit; every other journey starts as a
+// returning visitor. The panel itself is covered in its own test below.
+test.beforeEach(async ({ page }, info) => {
+  if (info.title.includes('first visit')) return
+  await page.addInitScript(() => localStorage.setItem('adensa.aboutSeen', '1'))
+})
+
 /**
  * Fail the test on any console error or uncaught page exception.
  *
@@ -226,6 +233,28 @@ test.describe('document downloads', () => {
     const bytes = readFileSync(path!)
     expect(bytes.subarray(0, 4).toString()).toBe('%PDF')
 
+    expect(errors).toEqual([])
+  })
+})
+
+test.describe('about this project', () => {
+  test('first visit opens the About panel once; the footer reopens it', async ({ page }) => {
+    const errors = watchErrors(page)
+    await page.goto('/')
+    // The dialog's name follows the step title, so find it by role.
+    const dialog = page.getByRole('dialog')
+    await expect(dialog).toHaveAccessibleName('AdensaOps')
+    for (let i = 0; i < 3; i++) await dialog.getByRole('button', { name: 'Next' }).click()
+    await expect(dialog).toHaveAccessibleName('Demo and Real data')
+    await dialog.getByRole('button', { name: 'Open the dashboard' }).click()
+    await expect(dialog).toBeHidden()
+
+    await page.reload()
+    await expect(page.getByRole('dialog')).toBeHidden()
+
+    await page.getByRole('button', { name: 'About this project' }).click()
+    await expect(page.getByRole('dialog', { name: 'AdensaOps' })).toBeVisible()
+    await expect(page.locator('footer')).toContainText('Built by Selasey Gbeddy')
     expect(errors).toEqual([])
   })
 })

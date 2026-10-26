@@ -1,4 +1,4 @@
-// Adensa Ops — local record store.
+// AdensaOps — local record store.
 //
 // The static build has no server yet, so records created in the UI (quotes,
 // customers, orders from accepted quotes) are kept in the browser and merged

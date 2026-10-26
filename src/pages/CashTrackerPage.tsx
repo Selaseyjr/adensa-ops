@@ -97,7 +97,7 @@ function RecordPaymentForm({
       return
     }
     if (label.trim().length === 0) {
-      setError('Say what this payment was for — the ledger is only as good as its labels.')
+      setError('Add a label for this payment.')
       return
     }
     if (!date) {
@@ -197,7 +197,7 @@ function RecordPaymentForm({
       </div>
       <div>
         <label className={labelCls} htmlFor="cash-order">
-          Link to an order (optional{kind === 'expense_out' ? ' — supplier payments only benefit' : ''})
+          Link to an order (optional{kind === 'expense_out' ? ', supplier payments only' : ''})
         </label>
         <select
           id="cash-order"
@@ -206,7 +206,7 @@ function RecordPaymentForm({
           disabled={kind === 'expense_out'}
           className={`${inputCls} mt-1.5 disabled:opacity-50`}
         >
-          <option value="">No order — general</option>
+          <option value="">No order · general</option>
           {openOrders.map((o) => (
             <option key={o.id} value={o.id}>
               {o.id} · {data.customers.find((c) => c.id === o.customerId)?.name ?? 'Customer'} ·{' '}
@@ -579,7 +579,7 @@ export function CashTrackerPage({
                       {isIn(entry.kind) ? ghs(entry.ghs) : ''}
                     </td>
                     <td className="num px-4 py-2.5 text-right font-medium text-ink">
-                      {!isIn(entry.kind) ? `−${ghs(entry.ghs)}` : ''}
+                      {!isIn(entry.kind) ? ghs(-entry.ghs) : ''}
                     </td>
                     <td className="num px-4 py-2.5 text-right text-ink-soft">{ghs(running)}</td>
                     <td className="px-4 py-2.5 text-right">

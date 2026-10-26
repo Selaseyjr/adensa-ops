@@ -32,6 +32,12 @@
   details", "Demo data. Synthetic records…" banners, or on-screen instructions
   telling users how to use a feature. The Demo/Real toggle already communicates
   the data mode; do not add mode banners.
+- **One exception: "About this project"** (`src/components/AboutProject.tsx`).
+  It opens once on a first visit (remembered in `adensa.aboutSeen`), then only
+  from the footer link. It describes the product, the business rules and the
+  stack; it never tells the user where to click. Keep it to four short steps.
+- Every page ends with the footer "Built by Selasey Gbeddy · GitHub · Case
+  study · About this project".
 - Keep on-screen text short. Placeholders in tables are `N/A` (never a dash).
 - Money is always printed with `formatGhs` (`src/lib/format.ts`, re-exported as
   `ghs`): screens, charts, PDFs, toasts and notifications. Never build
@@ -44,8 +50,10 @@
 - Product name: **AdensaOps** (one word, as the operator writes it) in titles,
   aria labels and on-screen nameplates. The company name stays
   "Adensa Supply & Logistics Ltd."
-- Landing page carries an **AdensaOps** nameplate eyebrow above the
-  "Welcome back!" heading; keep it.
+- Customer-facing outputs (quote sheet, invoice and receipt PDFs) carry the
+  company name and slogan, never "AdensaOps".
+- Meta description and Open Graph tags live in `index.html`; the preview image
+  `public/og-image.png` comes from `npm run brand:assets`.
 - Notification copy: plain, brief, factual. Empty state: "You're all caught
   up" + one short line. No enumerations of features in the empty state.
 
