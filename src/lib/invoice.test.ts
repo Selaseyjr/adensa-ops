@@ -61,8 +61,9 @@ describe('buildInvoiceModel', () => {
       { description: 'Ball valves', qty: 10, unitGhs: 45, amountGhs: 450 },
     ])
     expect(m.totalGhs).toBe(12_000)
-    expect(m.depositGhs).toBe(20_000)
-    // Balance clamps at zero — an overpayment is not a negative balance.
+    // Paid to date is capped at the contract value (same rule as lib/metrics).
+    expect(m.depositGhs).toBe(12_000)
+    // Balance clamps at zero: an overpayment is not a negative balance.
     expect(m.balanceGhs).toBe(0)
     expect(m.status).toBe('paid')
     expect(m.deliveryLabel).toBe('Expected delivery')
@@ -73,6 +74,15 @@ describe('buildInvoiceModel', () => {
     const m = buildInvoiceModel({ ...order, depositGhs: 5_000 }, [customer])
     expect(m.balanceGhs).toBe(7_000)
     expect(m.status).toBe('partial')
+  })
+
+  it('counts balance payments from the cash ledger, not just the deposit', () => {
+    const m = buildInvoiceModel({ ...order, depositGhs: 8_400 }, [customer], '2026-10-16', [
+      { id: 'c1', date: '2026-10-10', kind: 'balance_in', ghs: 3_600, label: '', orderId: 'ORD-0233' },
+    ])
+    expect(m.depositGhs).toBe(12_000)
+    expect(m.balanceGhs).toBe(0)
+    expect(m.status).toBe('paid')
   })
 
   it('reports due status when nothing has been received', () => {

@@ -10,6 +10,7 @@
 import type { jsPDF } from 'jspdf'
 import type { CashEntry, CashKind, Customer, Order } from '../types'
 import { formatGhs } from './format'
+import { PAYMENT_TERMS, cashReceived } from './rules'
 
 /* ── print-safe palette (mirrors the quote sheet) ─────────────────────── */
 const INK: [number, number, number] = [14, 27, 44] // #0e1b2c navy
@@ -78,7 +79,12 @@ export interface InvoiceModel {
   note?: string;
 }
 
-export function buildInvoiceModel(order: Order, customers: Customer[], asOf = todayIso()): InvoiceModel {
+export function buildInvoiceModel(
+  order: Order,
+  customers: Customer[],
+  asOf = todayIso(),
+  cash: CashEntry[] = [],
+): InvoiceModel {
   const customer = customers.find((c) => c.id === order.customerId)
   // Seeded orders may omit lines; the contract value is still billable.
   const lines: InvoiceLine[] = order.lines.length
@@ -100,7 +106,9 @@ export function buildInvoiceModel(order: Order, customers: Customer[], asOf = to
   if (customer?.contactPerson) contactLines.push(customer.contactPerson)
   if (customer?.phone) contactLines.push(customer.phone)
   if (customer?.city) contactLines.push(customer.city)
-  const balance = Math.max(0, order.valueGhs - order.depositGhs)
+  // Received = deposit + later balance payments (same definition as lib/metrics).
+  const received = cashReceived(order, cash)
+  const balance = Math.max(0, order.valueGhs - received)
   return {
     number: `INV-${order.id}`,
     orderId: order.id,
@@ -112,9 +120,9 @@ export function buildInvoiceModel(order: Order, customers: Customer[], asOf = to
     deliveryOn: order.completedOn ?? order.expectedDelivery,
     lines,
     totalGhs: order.valueGhs,
-    depositGhs: order.depositGhs,
+    depositGhs: received,
     balanceGhs: balance,
-    status: balance === 0 ? 'paid' : order.depositGhs > 0 ? 'partial' : 'due',
+    status: balance === 0 ? 'paid' : received > 0 ? 'partial' : 'due',
     note: order.receipt?.note ?? order.notes,
   }
 }
@@ -358,7 +366,7 @@ export async function renderInvoicePdf(m: InvoiceModel): Promise<jsPDF> {
     y += 6
   }
   totalRow('Total', money(m.totalGhs), false)
-  totalRow('Deposit received', money(m.depositGhs), false)
+  totalRow('Paid to date', money(m.depositGhs), false)
   doc.setDrawColor(INK[0], INK[1], INK[2])
   doc.setLineWidth(0.4)
   doc.line(128, y - 3, M.right, y - 3)
@@ -378,6 +386,16 @@ export async function renderInvoicePdf(m: InvoiceModel): Promise<jsPDF> {
   const statusLines = doc.splitTextToSize(statusText, 62) as string[]
   doc.text(statusLines, 128, y)
   y += statusLines.length * 4.5 + 4
+
+  // Payment terms (business rules), on every unpaid invoice.
+  if (m.status !== 'paid') {
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(7.5)
+    doc.setTextColor(SOFT[0], SOFT[1], SOFT[2])
+    const terms = doc.splitTextToSize(PAYMENT_TERMS, 62) as string[]
+    doc.text(terms, 128, y)
+    y += terms.length * 3.6 + 4
+  }
 
   // Notes (discrepancy or order note)
   if (m.note) {
@@ -483,8 +501,8 @@ export async function renderReceiptPdf(m: ReceiptModel): Promise<jsPDF> {
 /* --------------------------------------------------------------------- */
 /* one-call downloads (render + hand to the browser)                      */
 
-export async function downloadInvoicePdf(order: Order, customers: Customer[]): Promise<void> {
-  const model = buildInvoiceModel(order, customers)
+export async function downloadInvoicePdf(order: Order, customers: Customer[], cash: CashEntry[] = []): Promise<void> {
+  const model = buildInvoiceModel(order, customers, undefined, cash)
   ;(await renderInvoicePdf(model)).save(invoiceFilename(model))
 }
 

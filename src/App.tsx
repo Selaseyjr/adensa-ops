@@ -220,6 +220,7 @@ function AppInner() {
         id: orderId,
         customerId: q.customerId,
         lines: (q.lines ?? []).map((l) => ({
+          ...(l.productId ? { productId: l.productId } : {}),
           description: l.description,
           qty: l.qty,
           unitGhs: l.unitPriceGhs,
@@ -613,7 +614,7 @@ function AppInner() {
                 emptyNote={mode === 'real' ? 'Live system events will appear once activity is recorded.' : undefined}
               />
               <button
-                onClick={() => setPage('quotes')}
+                onClick={() => startTransition(() => navigate('/quotes?new=1'))}
                 className="hidden h-9 items-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-semibold text-on-primary transition hover:bg-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 focus-visible:ring-offset-surface sm:inline-flex"
               >
                 <Plus size={14} aria-hidden="true" />
