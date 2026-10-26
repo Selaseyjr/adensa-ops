@@ -511,7 +511,7 @@ export function OrdersPage({
           aria-pressed={stageFilter === 'all'}
           className={`min-h-11 min-w-[110px] shrink-0 rounded-xl border px-3 py-2 text-left transition ${
             stageFilter === 'all'
-              ? 'border-brand-600 bg-brand-600 text-white shadow-sm'
+              ? 'border-primary bg-primary text-on-primary shadow-sm'
               : 'border-line bg-surface text-ink-soft hover:border-brand-300'
           }`}
         >
@@ -529,7 +529,7 @@ export function OrdersPage({
               aria-pressed={active}
               className={`min-h-11 min-w-[118px] shrink-0 rounded-xl border px-3 py-2 text-left transition ${
                 active
-                  ? 'border-brand-600 bg-brand-600 text-white shadow-sm'
+                  ? 'border-primary bg-primary text-on-primary shadow-sm'
                   : 'border-line bg-surface text-ink-soft hover:border-brand-300'
               }`}
             >
@@ -579,7 +579,7 @@ export function OrdersPage({
                 <button
                   type="button"
                   onClick={() => onNavigate('quotes')}
-                  className="rounded-lg bg-brand-600 px-4 py-2 text-xs font-medium text-white transition hover:bg-brand-700"
+                  className="rounded-lg bg-primary px-4 py-2 text-xs font-medium text-on-primary transition hover:bg-primary-hover"
                 >
                   Open quote builder
                 </button>
@@ -631,7 +631,7 @@ export function OrdersPage({
                       <td className="px-4 py-3">
                         <span className="num font-medium text-ink">{o.id}</span>
                         {o.receipt && o.receipt.condition !== 'complete' && (
-                          <span className="ml-2 inline-block rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">
+                          <span className="ml-2 inline-block rounded-full bg-warning-soft px-1.5 py-0.5 text-[10px] font-medium text-warning">
                             discrepancy
                           </span>
                         )}
@@ -651,7 +651,7 @@ export function OrdersPage({
                           <span className="flex items-center gap-1.5 text-ink-soft">
                             {o.expectedDelivery}
                             {late && (
-                              <span className="rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] font-medium text-rose-700 dark:bg-rose-950/60 dark:text-rose-300">
+                              <span className="rounded-full bg-danger-soft px-1.5 py-0.5 text-[10px] font-medium text-danger">
                                 late
                               </span>
                             )}
@@ -733,7 +733,7 @@ export function OrdersPage({
               <div
                 className={`rounded-lg border p-3 ${
                   balance === 0
-                    ? 'border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/40'
+                    ? 'border-success/40 bg-success-soft'
                     : 'border-line bg-subtle'
                 }`}
               >
@@ -779,7 +779,7 @@ export function OrdersPage({
                 <div className="mt-0.5 text-ink">
                   {open.expectedDelivery ?? '—'}
                   {isLate(open, today) && (
-                    <span className="ml-1.5 rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] font-medium text-rose-700 dark:bg-rose-950/60 dark:text-rose-300">
+                    <span className="ml-1.5 rounded-full bg-danger-soft px-1.5 py-0.5 text-[10px] font-medium text-danger">
                       late
                     </span>
                   )}
@@ -806,7 +806,7 @@ export function OrdersPage({
             </div>
 
             {open.receipt && open.receipt.condition !== 'complete' && (
-              <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+              <div className="flex items-start gap-2 rounded-lg border border-warning/40 bg-warning-soft p-3 text-xs text-warning">
                 <AlertTriangle size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
                 <div>
                   <span className="font-medium">Discrepancy on delivery: </span>
@@ -839,9 +839,9 @@ export function OrdersPage({
                       }}
                       inputMode="decimal"
                       placeholder="e.g. 8000"
-                      className={`${inputCls} mt-1.5 ${amountError ? 'border-rose-400 focus:ring-rose-300' : ''}`}
+                      className={`${inputCls} mt-1.5 ${amountError ? 'border-danger/40 focus:ring-danger/40' : ''}`}
                     />
-                    {amountError && <p className="mt-1.5 text-xs text-rose-600 dark:text-rose-400">{amountError}</p>}
+                    {amountError && <p className="mt-1.5 text-xs text-danger">{amountError}</p>}
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {[25, 50].map((pct) => (
@@ -873,7 +873,7 @@ export function OrdersPage({
                     <button
                       type="button"
                       onClick={() => submitDeposit(open, true)}
-                      className="rounded-lg bg-brand-600 px-4 py-2 text-xs font-medium text-white transition hover:bg-brand-700"
+                      className="rounded-lg bg-primary px-4 py-2 text-xs font-medium text-on-primary transition hover:bg-primary-hover"
                     >
                       Record deposit
                     </button>
@@ -896,9 +896,9 @@ export function OrdersPage({
                       }}
                       inputMode="decimal"
                       placeholder="e.g. 5000"
-                      className={`${inputCls} mt-1.5 ${amountError ? 'border-rose-400 focus:ring-rose-300' : ''}`}
+                      className={`${inputCls} mt-1.5 ${amountError ? 'border-danger/40 focus:ring-danger/40' : ''}`}
                     />
-                    {amountError && <p className="mt-1.5 text-xs text-rose-600 dark:text-rose-400">{amountError}</p>}
+                    {amountError && <p className="mt-1.5 text-xs text-danger">{amountError}</p>}
                   </div>
                   <div className="flex justify-end gap-2">
                     <button
@@ -911,7 +911,7 @@ export function OrdersPage({
                     <button
                       type="button"
                       onClick={() => submitDeposit(open, false)}
-                      className="rounded-lg bg-brand-600 px-4 py-2 text-xs font-medium text-white transition hover:bg-brand-700"
+                      className="rounded-lg bg-primary px-4 py-2 text-xs font-medium text-on-primary transition hover:bg-primary-hover"
                     >
                       Record payment
                     </button>
@@ -954,7 +954,7 @@ export function OrdersPage({
                             aria-pressed={condition === value}
                             className={`min-h-11 flex-1 rounded-lg border px-2 text-xs font-medium transition ${
                               condition === value
-                                ? 'border-brand-600 bg-brand-600 text-white'
+                                ? 'border-primary bg-primary text-on-primary'
                                 : 'border-line-strong bg-surface text-ink-soft hover:border-brand-400'
                             }`}
                           >
@@ -981,9 +981,9 @@ export function OrdersPage({
                           ? 'e.g. Offloaded at site, confirmed by storekeeper'
                           : 'e.g. 8 of 30 bags torn; 2 helmets missing'
                       }
-                      className={`${inputCls} mt-1.5 resize-none ${delError ? 'border-rose-400 focus:ring-rose-300' : ''}`}
+                      className={`${inputCls} mt-1.5 resize-none ${delError ? 'border-danger/40 focus:ring-danger/40' : ''}`}
                     />
-                    {delError && <p className="mt-1.5 text-xs text-rose-600 dark:text-rose-400">{delError}</p>}
+                    {delError && <p className="mt-1.5 text-xs text-danger">{delError}</p>}
                   </div>
                   <div className="flex justify-end gap-2">
                     <button
@@ -996,7 +996,7 @@ export function OrdersPage({
                     <button
                       type="button"
                       onClick={() => submitDelivery(open)}
-                      className="rounded-lg bg-brand-600 px-4 py-2 text-xs font-medium text-white transition hover:bg-brand-700"
+                      className="rounded-lg bg-primary px-4 py-2 text-xs font-medium text-on-primary transition hover:bg-primary-hover"
                     >
                       Confirm delivery
                     </button>
@@ -1018,9 +1018,9 @@ export function OrdersPage({
                         setAmountError('')
                       }}
                       inputMode="decimal"
-                      className={`${inputCls} mt-1.5 ${amountError ? 'border-rose-400 focus:ring-rose-300' : ''}`}
+                      className={`${inputCls} mt-1.5 ${amountError ? 'border-danger/40 focus:ring-danger/40' : ''}`}
                     />
-                    {amountError && <p className="mt-1.5 text-xs text-rose-600 dark:text-rose-400">{amountError}</p>}
+                    {amountError && <p className="mt-1.5 text-xs text-danger">{amountError}</p>}
                     <p className="mt-1.5 text-[11px] text-ink-faint">
                       Paying the full balance settles the order; anything less keeps it open with the remainder due.
                     </p>
@@ -1036,7 +1036,7 @@ export function OrdersPage({
                     <button
                       type="button"
                       onClick={() => submitBalance(open)}
-                      className="rounded-lg bg-brand-600 px-4 py-2 text-xs font-medium text-white transition hover:bg-brand-700"
+                      className="rounded-lg bg-primary px-4 py-2 text-xs font-medium text-on-primary transition hover:bg-primary-hover"
                     >
                       Record payment
                     </button>
@@ -1080,7 +1080,7 @@ export function OrdersPage({
                           type="button"
                           onClick={() => setEditLines((ls) => ls.filter((x) => x.key !== l.key))}
                           aria-label={`Remove item ${i + 1}`}
-                          className="mt-1.5 shrink-0 rounded-lg p-1.5 text-ink-faint transition hover:bg-track hover:text-rose-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300"
+                          className="mt-1.5 shrink-0 rounded-lg p-1.5 text-ink-faint transition hover:bg-track hover:text-danger focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300"
                         >
                           <Trash2 size={15} aria-hidden="true" />
                         </button>
@@ -1162,7 +1162,7 @@ export function OrdersPage({
                     />
                   </div>
 
-                  {editError && <p className="text-xs text-rose-600 dark:text-rose-400">{editError}</p>}
+                  {editError && <p className="text-xs text-danger">{editError}</p>}
 
                   <div className="flex justify-end gap-2">
                     <button
@@ -1175,7 +1175,7 @@ export function OrdersPage({
                     <button
                       type="button"
                       onClick={() => submitEdit(open)}
-                      className="rounded-lg bg-brand-600 px-4 py-2 text-xs font-medium text-white transition hover:bg-brand-700"
+                      className="rounded-lg bg-primary px-4 py-2 text-xs font-medium text-on-primary transition hover:bg-primary-hover"
                     >
                       Save changes
                     </button>
@@ -1205,7 +1205,7 @@ export function OrdersPage({
                         onClick={() =>
                           onOrderAction(open.id, { stage: 'quoted' }, { message: `${open.id} approved and marked as quoted.` })
                         }
-                        className="flex min-h-11 items-center gap-1.5 rounded-lg bg-brand-600 px-4 py-2 text-xs font-medium text-white transition hover:bg-brand-700"
+                        className="flex min-h-11 items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-medium text-on-primary transition hover:bg-primary-hover"
                       >
                         <CheckCircle2 size={14} aria-hidden="true" /> Approve order
                       </button>
@@ -1217,7 +1217,7 @@ export function OrdersPage({
                           setPanel('deposit')
                           setAmount('')
                         }}
-                        className="flex min-h-11 items-center gap-1.5 rounded-lg bg-brand-600 px-4 py-2 text-xs font-medium text-white transition hover:bg-brand-700"
+                        className="flex min-h-11 items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-medium text-on-primary transition hover:bg-primary-hover"
                       >
                         <Banknote size={14} aria-hidden="true" /> Record deposit
                       </button>
@@ -1243,7 +1243,7 @@ export function OrdersPage({
                             onOrderAction(open.id, { stage: 'ordered' }, { message: `${open.id} placed with supplier.` })
                           }
                           title={open.depositGhs <= 0 ? 'Record the deposit first' : undefined}
-                          className="flex min-h-11 items-center gap-1.5 rounded-lg bg-brand-600 px-4 py-2 text-xs font-medium text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-45"
+                          className="flex min-h-11 items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-medium text-on-primary transition hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-45"
                         >
                           <Truck size={14} aria-hidden="true" /> Place supplier order
                         </button>
@@ -1271,7 +1271,7 @@ export function OrdersPage({
                             setCondition('complete')
                             setDelNote('')
                           }}
-                          className="flex min-h-11 items-center gap-1.5 rounded-lg bg-brand-600 px-4 py-2 text-xs font-medium text-white transition hover:bg-brand-700"
+                          className="flex min-h-11 items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-medium text-on-primary transition hover:bg-primary-hover"
                         >
                           <ClipboardCheck size={14} aria-hidden="true" /> Record delivery
                         </button>
@@ -1285,7 +1285,7 @@ export function OrdersPage({
                             setPanel('settle')
                             setAmount(String(balanceOf(open)))
                           }}
-                          className="flex min-h-11 items-center gap-1.5 rounded-lg bg-brand-600 px-4 py-2 text-xs font-medium text-white transition hover:bg-brand-700"
+                          className="flex min-h-11 items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-medium text-on-primary transition hover:bg-primary-hover"
                         >
                           <Banknote size={14} aria-hidden="true" /> Collect balance
                         </button>
@@ -1299,13 +1299,13 @@ export function OrdersPage({
                               { message: `${open.id} settled — cash complete.` },
                             )
                           }
-                          className="flex min-h-11 items-center gap-1.5 rounded-lg bg-brand-600 px-4 py-2 text-xs font-medium text-white transition hover:bg-brand-700"
+                          className="flex min-h-11 items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-medium text-on-primary transition hover:bg-primary-hover"
                         >
                           <CheckCircle2 size={14} aria-hidden="true" /> Close order
                         </button>
                       ))}
                     {open.stage === 'settled' && (
-                      <span className="flex min-h-11 items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-medium text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300">
+                      <span className="flex min-h-11 items-center gap-1.5 rounded-lg border border-success/40 bg-success-soft px-4 py-2 text-xs font-medium text-success">
                         <PackageCheck size={14} aria-hidden="true" /> Complete
                       </span>
                     )}

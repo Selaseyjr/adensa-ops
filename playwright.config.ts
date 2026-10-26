@@ -18,6 +18,9 @@ export default defineConfig({
     trace: 'on-first-retry',
     // The sim writes nothing to storage, but each test starts clean.
     storageState: undefined,
+    // CHROMIUM_PATH: run against a preinstalled browser when the pinned
+    // Playwright build is not downloaded (sandboxes, offline machines).
+    ...(process.env.CHROMIUM_PATH ? { launchOptions: { executablePath: process.env.CHROMIUM_PATH } } : {}),
   },
   projects: [
     { name: 'desktop-chromium', use: { ...devices['Desktop Chrome'] } },

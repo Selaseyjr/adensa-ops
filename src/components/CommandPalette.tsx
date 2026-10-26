@@ -232,13 +232,13 @@ export function CommandPalette({
                   onMouseEnter={() => setCursor(idx)}
                   onClick={entry.run}
                   className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left transition ${
-                    idx === cursor ? 'bg-brand-600 text-white' : 'text-ink-soft hover:bg-subtle'
+                    idx === cursor ? 'bg-primary text-on-primary' : 'text-ink-soft hover:bg-subtle'
                   }`}
                 >
-                  <Icon size={15} className={`shrink-0 ${idx === cursor ? 'text-white' : 'text-ink-faint'}`} aria-hidden="true" />
+                  <Icon size={15} className={`shrink-0 ${idx === cursor ? 'text-on-primary' : 'text-ink-faint'}`} aria-hidden="true" />
                   <span className="min-w-0 flex-1 truncate text-sm font-medium">{entry.label}</span>
                   {entry.hint && (
-                    <span className={`shrink-0 text-xs ${idx === cursor ? 'text-white/80' : 'text-ink-faint'}`}>
+                    <span className={`shrink-0 text-xs ${idx === cursor ? 'text-on-primary/80' : 'text-ink-faint'}`}>
                       {entry.hint}
                     </span>
                   )}

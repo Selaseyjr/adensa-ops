@@ -111,7 +111,7 @@ export class ErrorBoundary extends Component<EBProps, EBState> {
         </p>
         <button
           onClick={() => this.setState({ error: null })}
-          className="mt-4 cursor-pointer rounded-lg bg-brand-600 px-4 py-2 text-xs font-medium text-white transition hover:bg-brand-700"
+          className="mt-4 cursor-pointer rounded-lg bg-primary px-4 py-2 text-xs font-medium text-on-primary transition hover:bg-primary-hover"
         >
           Try again
         </button>

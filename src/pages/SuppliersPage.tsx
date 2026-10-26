@@ -175,7 +175,7 @@ export function SuppliersPage({ data }: { data: Dataset }) {
               <Star
                 key={i}
                 size={13}
-                className={i < s.reliability! ? 'fill-amber-400 text-amber-400' : 'text-track'}
+                className={i < s.reliability! ? 'fill-warning text-warning' : 'text-track'}
               />
             ))}
           </span>
@@ -192,7 +192,7 @@ export function SuppliersPage({ data }: { data: Dataset }) {
           <span>
             {prices.length}
             {stale && (
-              <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">
+              <span className="ml-2 rounded-full bg-warning-soft px-2 py-0.5 text-[11px] font-medium text-warning">
                 stale
               </span>
             )}

@@ -1,5 +1,5 @@
-// Theme state — 'The Night Never Falls' after all: the ops team works nights,
-// so dark mode is a first-class feature. The <html class="dark"> flag flips
+// Theme state: the ops team works nights, so dark mode is a first-class
+// feature. The <html class="dark"> flag flips
 // every --color-* token defined in index.css; index.html applies the saved
 // theme before first paint to avoid a flash.
 
@@ -27,7 +27,7 @@ export function applyTheme(theme: Theme): void {
   // Phone and tablet browsers tint the browser chrome with theme-color.
   document
     .querySelector('meta[name="theme-color"]:not([media])')
-    ?.setAttribute('content', theme === 'dark' ? '#111111' : '#FAFAF9');
+    ?.setAttribute('content', theme === 'dark' ? '#0A1220' : '#F6F5F1');
 }
 
 /** Provided by <App>; consumed by components that cannot inherit CSS tokens (Leaflet). */

@@ -4,177 +4,184 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  /* ---- Three families: Poppins (display), Inter (body), JetBrains Mono (figures) ---- */
+  /* ---- Type: Inter for every piece of UI (tabular figures for numbers).
+          Poppins is reserved for the ADENSA wordmark inside the logo. ---- */
   --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --font-display: "Poppins", "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --font-logo: "Poppins", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
 
   /* ============================================================
-     60-30-10 colour system — orange & black identity.
-     60% neutral surfaces: warm-white page, white surfaces, tone
-     (not borders) carries the separation.
-     30% structure: near-black text, quiet hairlines, a black
-     rail with orange accents — never navy, never violet.
-     10% accent/status: confident orange for primary actions and
-     key highlights only; teal success, amber warning, rose
-     error and ADENSA gold for money stay distinct — the console
-     is never all-orange.
-     Every text token is checked against the surface it sits on
-     (>= 4.5:1 for body, >= 3:1 for large/graphical) in BOTH
-     themes. Light mode values are the reference; the .dark block
-     re-tunes each one so nothing blends into the background.
+     First Light design tokens (light is the reference theme).
+     Calm neutral surfaces with thin borders, navy ink and navy
+     primary actions, gold as the single brand accent, and four
+     status colours that only ever carry meaning.
      ============================================================ */
 
-  /* ---- 60%: neutral surfaces (light) — warm white ---- */
-  --color-canvas: #fafaf9;   /* page: warm white */
-  --color-surface: #ffffff;
-  --color-subtle: #f5f5f4;
-  --color-track: #e7e5e4;
+  /* ---- Surfaces ---- */
+  --color-canvas: #f6f5f1;     /* page */
+  --color-surface: #ffffff;    /* cards, tables, rail */
+  --color-subtle: #f0eee8;     /* wells, hover rows */
+  --color-track: #e8e5dd;      /* bar tracks */
 
-  /* ---- 30%: structure + text (light) — near-black ---- */
-  --color-ink: #171717;        /* 17:1 on surface */
-  --color-ink-soft: #525252;   /* 7.4:1 on surface */
-  --color-ink-faint: #6b6b6b;  /* 5.3:1 on surface, 4.9:1 on subtle */
-  --color-line: #eceae7;       /* quiet hairline — tone over borders */
-  --color-line-strong: #d6d3d1;
+  /* ---- Ink + lines ---- */
+  --color-ink: #0e1b2c;        /* 17:1 on surface */
+  --color-ink-soft: #3d4a5c;   /* 9.4:1 on surface */
+  --color-ink-faint: #566072;  /* muted: 6.4:1 on surface */
+  --color-line: #e8e5dd;       /* thin borders */
+  --color-line-strong: #d9d5ca;
 
-  /* ---- Brand orange: confident, modern — one family, visible steps ---- */
-  --color-brand-50: #fff7ed;
-  --color-brand-100: #ffedd5;
-  --color-brand-200: #fed7aa;
-  --color-brand-300: #fdba74;
-  --color-brand-400: #fb923c;
-  --color-brand-500: #f97316;   /* the primary accent: fills, key highlights */
-  --color-brand-600: #c2410c;   /* primary buttons under white text: 5.2:1 */
-  --color-brand-700: #a83a10;   /* button hover (white text: 6.4:1) */
-  --color-brand-800: #8f2f0e;   /* orange TEXT on light surfaces: 8.5:1 */
-  --color-brand-900: #7c2d12;
-  --color-brand-950: #431407;
+  /* ---- Primary action (buttons, active nav, selected chips) ---- */
+  --color-primary: #0e1b2c;
+  --color-primary-hover: #22334a;
+  --color-on-primary: #ffffff;
 
-  /* ---- Black rail: the sidebar is near-black in BOTH themes
-          with orange accents. Text pairs checked (>= 8:1). ---- */
-  --color-rail: #171717;
-  --color-rail-soft: #262626;
-  --color-rail-line: #2e2e2e;
-  --color-rail-ink: #fafaf9;     /* 15.3:1 on rail */
-  --color-rail-ink-soft: #a3a3a3; /* 8.4:1 on rail */
+  /* ---- Brand scale: gold accents for links, focus rings and
+          highlights. 600-800 are the gold TEXT tones on white. ---- */
+  --color-brand-50: #fbf5e4;
+  --color-brand-100: #f5e8c3;
+  --color-brand-200: #ecd48c;
+  --color-brand-300: #e2bf57;
+  --color-brand-400: #d4a21e;   /* accent gold: fills, focus rings */
+  --color-brand-500: #d4a21e;
+  --color-brand-600: #8a6a12;   /* gold text on white: 5.3:1 */
+  --color-brand-700: #75590e;
+  --color-brand-800: #5f480b;
+  --color-brand-900: #3f3007;
+  --color-brand-950: #0a1220;   /* scrims */
 
-  /* ---- 10%: accent + status (light) ---- */
-  --color-gold-400: #c9a227;   /* ADENSA gold — money, mark, highlights */
-  --color-gold-500: #b8941f;
-  --color-gold-600: #8a6408;   /* deep gold: 5.4:1 on surface, 4.7:1 on canvas */
-  --color-gold-soft: #f7efd6;
-  --color-alert-amber: #b45309;  /* 4.9:1 on surface — warning */
-  --color-alert-rose: #be123c;   /* 6.3:1 on surface — error */
-  --color-success: #0f766e;      /* teal (5.5:1 on surface) — done / delivered */
+  /* ---- Sidebar rail: follows the surface in light ---- */
+  --color-rail: #ffffff;
+  --color-rail-soft: #f0eee8;
+  --color-rail-line: #e8e5dd;
+  --color-rail-ink: #0e1b2c;
+  --color-rail-ink-soft: #566072;
 
-  /* ---- HUD command-centre accents (Phase 1 palette) ---- */
-  --color-hud-accent: #8a6408;  /* gold trim, day: 5.4:1 on surface */
-  --color-panel-edge: #d6d3d1; /* quiet panel hairline */
-  --color-texture-dot: rgba(23, 23, 23, 0.05);
-  --color-chart-grid: #e7e5e4;  /* chart grid lines, day (matches track) */
+  /* ---- Gold ---- */
+  --color-gold-400: #d4a21e;
+  --color-gold-500: #d4a21e;
+  --color-gold-600: #8a6a12;   /* gold text on white */
+  --color-gold-soft: #fbf5e4;
 
-  /* ---- Semantic category / status / type scales (10% accents).
-          Deliberately MIXED earthy hues — stone, amber, orange,
-          teal and olive — so no single colour dominates and every
-          series stays distinguishable in both themes. Orange is a
-          highlight, never the whole chart. ---- */
-  --color-stage-draft: #78716c;
-  --color-stage-quoted: #d97706;
-  --color-stage-deposit: #ea580c;
-  --color-stage-ordered: #9a3412;
-  --color-stage-delivered: #0f766e;
-  --color-stage-settled: #9c7d12;  /* gold: the money has landed */
-  --color-cat-cement: #44403c;
-  --color-cat-plumbing: #c2410c;
-  --color-cat-electrical: #a16207;
-  --color-cat-safety: #0f766e;
-  --color-cat-tools: #4d7c0f;
-  --color-status-identified: #57534e;
-  --color-status-contacted: #c2410c;
-  --color-status-vetted: #0f766e;  /* teal: qualified */
-  --color-ctype-contractor: #292524;
-  --color-ctype-plumber: #ea580c;
-  --color-ctype-electrician: #d97706;
-  --color-ctype-business: #0f766e;
-  --color-ctype-individual: #78716c;
-  --color-ctype-institution: #4d7c0f;
+  /* ---- Status: meaning only, never decoration ---- */
+  --color-success: #1f8a5b;
+  --color-success-soft: #e6f4ec;
+  --color-warning: #a86400;
+  --color-warning-soft: #fdf3e1;
+  --color-danger: #c0392b;
+  --color-danger-soft: #fcedeb;
+  --color-info: #2f6fdb;
+  --color-info-soft: #e8effc;
+  --color-alert-amber: #a86400;
+  --color-alert-rose: #c0392b;
+
+  --color-chart-grid: #e8e5dd;
+
+  /* ---- Series colours.
+          Stages are ordinal, so they step along one navy ramp (light to
+          dark = draft to settled). Categories and customer types are
+          identity, so they take a validated categorical order (CVD-safe,
+          checked against both surfaces) that stays clear of the status
+          hues. Supplier status reuses info/success because it IS a state.
+          ---- */
+  --color-cash-in: #2a78d6;
+  --color-cash-out: #eda100;
+  --color-stage-draft: #c9d0da;
+  --color-stage-quoted: #9fabbd;
+  --color-stage-deposit: #7487a1;
+  --color-stage-ordered: #4c6283;
+  --color-stage-delivered: #2c4366;
+  --color-stage-settled: #0e1b2c;
+  --color-cat-cement: #2a78d6;
+  --color-cat-plumbing: #eb6834;
+  --color-cat-electrical: #1baf7a;
+  --color-cat-safety: #eda100;
+  --color-cat-tools: #e87ba4;
+  --color-status-identified: #8a93a1;
+  --color-status-contacted: #2f6fdb;
+  --color-status-vetted: #1f8a5b;
+  --color-ctype-contractor: #2a78d6;
+  --color-ctype-plumber: #eb6834;
+  --color-ctype-electrician: #1baf7a;
+  --color-ctype-business: #eda100;
+  --color-ctype-individual: #e87ba4;
+  --color-ctype-institution: #008300;
 }
 
-/* Unlayered rules beat Tailwind's @layer theme — .dark always wins.
-   Dark mode re-tunes BOTH surfaces (lighter, separated) and text
-   (brighter) so the deep blues never blend into the background. */
+/* Unlayered rules beat Tailwind's @layer theme, so .dark always wins. */
 .dark {
-  /* ---- 60%: neutral surfaces — near-black page, charcoal surfaces ---- */
-  --color-canvas: #111111;      /* page: near-black */
-  --color-surface: #1a1a1a;     /* main surfaces */
-  --color-subtle: #242424;      /* elevated surfaces / wells */
-  --color-track: #333333;       /* bars/wells: visible on subtle */
+  --color-canvas: #0a1220;
+  --color-surface: #101c2e;
+  --color-subtle: #16243a;
+  --color-track: #1e2c43;
 
-  /* ---- 30%: structure + text, all brightened ---- */
-  --color-ink: #fafaf9;         /* 16:1 on surface */
-  --color-ink-soft: #a3a3a3;    /* 6.9:1 on surface */
-  --color-ink-faint: #949494;   /* 5.7:1 on surface, 5.1:1 on subtle */
-  --color-line: #2e2e2e;        /* quiet hairline on charcoal */
-  --color-line-strong: #404040;
+  --color-ink: #e8ecf2;        /* 14:1 on surface */
+  --color-ink-soft: #c1cad6;
+  --color-ink-faint: #9aa6b8;  /* muted: 6.9:1 on surface */
+  --color-line: #1e2c43;
+  --color-line-strong: #2a3b56;
 
-  /* ---- Brand orange at night: #fb923c / #fdba74 are the dark-mode
-          accent + hover tones; buttons keep #ea580c under white (4.8:1). ---- */
-  --color-brand-50: #431407;
-  --color-brand-100: #ffedd5;
-  --color-brand-200: #fed7aa;
-  --color-brand-300: #fdba74;   /* strong accent / hover tone at night */
-  --color-brand-400: #fb923c;   /* links + accents on surface: 8.7:1 */
-  --color-brand-500: #f97316;
-  --color-brand-600: #c2410c;   /* button bg under white text: 5.2:1 */
-  --color-brand-700: #a83a10;   /* button hover: 6.4:1 under white */
-  --color-brand-800: #8f2f0e;
-  --color-brand-900: #7c2d12;
-  --color-brand-950: #431407;
+  --color-primary: #e0b23a;
+  --color-primary-hover: #ebc35a;
+  --color-on-primary: #0a1220;  /* navy on gold: 9.6:1 */
 
-  /* ---- Black rail deepens a step at night ---- */
-  --color-rail: #0d0d0d;
-  --color-rail-soft: #1f1f1f;
-  --color-rail-line: #262626;
-  --color-rail-ink: #fafaf9;     /* 16.4:1 on rail */
-  --color-rail-ink-soft: #a3a3a3; /* 9.1:1 on rail */
+  --color-brand-50: #241f12;
+  --color-brand-100: #f5e8c3;
+  --color-brand-200: #f0d993;
+  --color-brand-300: #ebc35a;
+  --color-brand-400: #e0b23a;   /* gold text + rings on surface: 8.4:1 */
+  --color-brand-500: #e0b23a;
+  --color-brand-600: #e0b23a;
+  --color-brand-700: #ebc35a;
+  --color-brand-800: #f0d993;
+  --color-brand-900: #3a3017;
+  --color-brand-950: #050a13;
 
-  /* ---- 10%: accent + status, brightened for dark ---- */
-  --color-gold-400: #f0c75e;    /* gold glows on dark */
-  --color-gold-500: #d9ad33;
-  --color-gold-600: #e6c255;
-  --color-gold-soft: #2e2a16;
-  --color-alert-amber: #fbbf24; /* 9.6:1 on surface */
-  --color-alert-rose: #fb7185;  /* 7.1:1 on surface */
-  --color-success: #2dd4bf;     /* teal glows on dark */
+  --color-rail: #101c2e;
+  --color-rail-soft: #16243a;
+  --color-rail-line: #1e2c43;
+  --color-rail-ink: #e8ecf2;
+  --color-rail-ink-soft: #9aa6b8;
 
-  /* ---- HUD command-centre accents (Phase 1 palette) ---- */
-  --color-hud-accent: #f0c75e;  /* gold trim, night */
-  --color-panel-edge: #404040;  /* charcoal panel hairline */
-  --color-texture-dot: rgba(250, 250, 249, 0.05);
-  --color-chart-grid: #3a3a3a;  /* brighter than line so graphs read on dark */
+  --color-gold-400: #e0b23a;
+  --color-gold-500: #e0b23a;
+  --color-gold-600: #e0b23a;
+  --color-gold-soft: #241f12;
 
-  /* Scales lifted for dark: same order, all readable on surface. */
-  --color-stage-draft: #a8a29e;
-  --color-stage-quoted: #fbbf24;
-  --color-stage-deposit: #fb923c;
-  --color-stage-ordered: #ea580c;
-  --color-stage-delivered: #2dd4bf;
-  --color-stage-settled: #f0c75e;  /* gold: the money has landed */
-  --color-cat-cement: #a8a29e;
-  --color-cat-plumbing: #fb923c;
-  --color-cat-electrical: #fbbf24;
-  --color-cat-safety: #2dd4bf;
-  --color-cat-tools: #a3e635;
-  --color-status-identified: #a8a29e;
-  --color-status-contacted: #fb923c;
-  --color-status-vetted: #2dd4bf;  /* teal: qualified */
-  --color-ctype-contractor: #d6d3d1;
-  --color-ctype-plumber: #fb923c;
-  --color-ctype-electrician: #fbbf24;
-  --color-ctype-business: #2dd4bf;
-  --color-ctype-individual: #a8a29e;
-  --color-ctype-institution: #a3e635;
+  --color-success: #4cc38a;
+  --color-success-soft: rgba(31, 138, 91, 0.18);
+  --color-warning: #f0a940;
+  --color-warning-soft: rgba(168, 100, 0, 0.2);
+  --color-danger: #f07063;
+  --color-danger-soft: rgba(192, 57, 43, 0.2);
+  --color-info: #6c9ef0;
+  --color-info-soft: rgba(47, 111, 219, 0.2);
+  --color-alert-amber: #f0a940;
+  --color-alert-rose: #f07063;
+
+  --color-chart-grid: #1e2c43;
+  --color-cash-in: #3987e5;
+  --color-cash-out: #c98500;
+
+  --color-stage-draft: #2e4060;
+  --color-stage-quoted: #43597c;
+  --color-stage-deposit: #5d7499;
+  --color-stage-ordered: #7b91b4;
+  --color-stage-delivered: #a3b4cf;
+  --color-stage-settled: #d4dce9;
+  --color-cat-cement: #3987e5;
+  --color-cat-plumbing: #d95926;
+  --color-cat-electrical: #199e70;
+  --color-cat-safety: #c98500;
+  --color-cat-tools: #d55181;
+  --color-status-identified: #9aa6b8;
+  --color-status-contacted: #6c9ef0;
+  --color-status-vetted: #4cc38a;
+  --color-ctype-contractor: #3987e5;
+  --color-ctype-plumber: #d95926;
+  --color-ctype-electrician: #199e70;
+  --color-ctype-business: #c98500;
+  --color-ctype-individual: #d55181;
+  --color-ctype-institution: #008300;
 }
 
 html,
@@ -200,19 +207,15 @@ body {
   color: var(--color-ink);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "cv11", "ss01";
 }
 
 /* ---- Dark canvas stays a plain near-black: no decorative gradients,
    no dot texture — calm and data-focused in both themes. */
 
-/* Display face: headings and hero numbers. */
-h1, h2, h3 {
-  font-family: var(--font-display);
-}
-
-/* Mono face: every money figure and record id reads as data. */
-.num {
-  font-family: var(--font-mono);
+/* Figures line up in columns: tabular numbers, same Inter face. */
+.num,
+table {
   font-variant-numeric: tabular-nums;
 }
 
@@ -268,7 +271,7 @@ h1, h2, h3 {
 }
 
 .dark .leaflet-control-attribution {
-  background: rgba(17, 17, 17, 0.88);
+  background: rgba(10, 18, 32, 0.88);
   color: var(--color-ink-faint);
 }
 
@@ -377,118 +380,6 @@ html.theme-crossfading *::after {
 }
 
 
-/* ---- Phase 2 prototype: HUD panel chrome (opt-in via .hud-panel) ----
-   Chamfered corners, a 1px cyan -> steel gradient frame, diagonal accent
-   lines on the cuts, and a title tick: the command-centre panel language.
-   Opt-in only — the Dashboard prototype uses it; every other page keeps
-   the soft cards until the look is approved.
-   Unlayered on purpose: it must beat Tailwind's layered border/bg
-   utilities (same mechanism as the .dark token overrides above), so no
-   !important and no utility surgery inside the components. */
-.hud-panel {
-  --hud-cut: 16px;
-  position: relative;
-  isolation: isolate; /* frame pseudo stays above the (transparent) panel
-                         background and below the content */
-  clip-path: polygon(
-    0 0,
-    calc(100% - var(--hud-cut)) 0,
-    100% var(--hud-cut),
-    100% 100%,
-    var(--hud-cut) 100%,
-    0 calc(100% - var(--hud-cut))
-  );
-  border-radius: 0;
-  border-color: transparent;
-  background-color: transparent;
-}
-
-/* The frame: 1px gradient ring (cyan at top-left, steel deepening to the
-   bottom-right), inset -1px so it lands exactly on the clipped edge.
-   Outer shadows (shadow-sm, hover, focus rings) are clipped away by the
-   chamfer — depth comes from this frame instead. */
-.hud-panel::before {
-  content: '';
-  position: absolute;
-  inset: -1px;
-  z-index: -1;
-  border: 1px solid transparent;
-  background:
-    linear-gradient(var(--color-surface), var(--color-surface)) padding-box,
-    linear-gradient(
-      160deg,
-      var(--color-brand-400),
-      var(--color-panel-edge) 45%,
-      color-mix(in srgb, var(--color-hud-accent) 32%, #000) 100%
-    ) border-box;
-}
-
-/* Diagonal accent line drawn ON each chamfer cut (top-right, bottom-left). */
-.hud-panel::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0.85;
-  background:
-    linear-gradient(225deg, transparent calc(50% - 0.5px), var(--color-hud-accent) 50%, transparent calc(50% + 0.5px))
-      no-repeat right top / var(--hud-cut) var(--hud-cut),
-    linear-gradient(225deg, transparent calc(50% - 0.5px), var(--color-hud-accent) 50%, transparent calc(50% + 0.5px))
-      no-repeat left bottom / var(--hud-cut) var(--hud-cut);
-}
-
-/* Panel header: hairline rule + a cyan tick before the title. */
-.hud-panel > header {
-  border-bottom: 1px solid color-mix(in srgb, var(--color-hud-accent) 22%, transparent);
-  padding-bottom: 0.75rem;
-}
-
-.hud-panel > header h3::before {
-  content: '';
-  display: inline-block;
-  width: 3px;
-  height: 0.85em;
-  margin-right: 8px;
-  vertical-align: -0.08em;
-  background: var(--color-hud-accent);
-}
-
-/* Keyboard focus: the chamfer clips outer rings, so the ring is drawn
-   INSIDE the frame (inset shadow on the frame pseudo + border tint). */
-.hud-panel:focus-visible {
-  border-color: var(--color-brand-400);
-}
-
-.hud-panel:focus-visible::before {
-  box-shadow: inset 0 0 0 2px var(--color-brand-400);
-}
-
-/* Gentle hover affordance for clickable panels (frame brightens). */
-.hud-panel:hover::before {
-  filter: brightness(1.12);
-}
-
-/* Phones keep the soft cards: chamfers read as glitch at small sizes. */
-@media (max-width: 639px) {
-  .hud-panel {
-    clip-path: none;
-    border-radius: 0.75rem;
-    border-color: var(--color-line);
-    background-color: var(--color-surface);
-  }
-  .hud-panel::before,
-  .hud-panel::after {
-    content: none;
-  }
-  .hud-panel > header {
-    border-bottom: none;
-    padding-bottom: 0;
-  }
-  .hud-panel > header h3::before {
-    content: none;
-  }
-}
-
 /* ---- /welcome: Glacier exhibition hero (pure CSS motion) ----
    Entrance choreography mirrors the template's original timing
    (0.7-0.85s, easeOut, delays 0.1-0.8s); the glows drift on slow
@@ -537,7 +428,7 @@ html.theme-crossfading *::after {
 .w-cta:hover { background-color: rgba(245, 239, 230, 0.12); border-color: rgba(245, 239, 230, 0.85); }
 .w-cta:active { transform: scale(0.97); }
 .w-cta:focus-visible {
-  outline: 2px solid #c9a227;
+  outline: 2px solid #d4a21e;
   outline-offset: 4px;
 }
 
@@ -575,8 +466,7 @@ html.theme-crossfading *::after {
   --color-card-foreground: var(--color-ink);
   --color-popover: var(--color-surface);
   --color-popover-foreground: var(--color-ink);
-  --color-primary: var(--color-brand-600);
-  --color-primary-foreground: #ffffff;
+  --color-primary-foreground: var(--color-on-primary);
   --color-secondary: var(--color-subtle);
   --color-secondary-foreground: var(--color-ink);
   --color-muted: var(--color-subtle);
@@ -587,5 +477,5 @@ html.theme-crossfading *::after {
   --color-destructive-foreground: #ffffff;
   --color-border: var(--color-line);
   --color-input: var(--color-line-strong);
-  --color-ring: var(--color-brand-300);
+  --color-ring: var(--color-brand-400);
 }

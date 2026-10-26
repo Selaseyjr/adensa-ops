@@ -1,6 +1,7 @@
 import { Suspense, lazy, startTransition, useEffect, useMemo, useRef, useState } from 'react'
 import { BrowserRouter, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import {
+  ChevronRight,
   FileText,
   LayoutDashboard,
   Lock,
@@ -8,10 +9,11 @@ import {
   EyeOff,
   Menu,
   Moon,
+  Plus,
   Search,
   Scale,
   Sun,
-  Tag,
+  Package,
   Truck,
   Users,
   Wallet,
@@ -38,8 +40,7 @@ import { demo } from './data/demo'
 import { demoNotifications } from './data/demoNotifications'
 import { real } from './data/real'
 import { daysSince, type CashEntry, type Customer, type Order, type Quote, type QuoteStatus } from './types'
-import lockupDay from './assets/adensa-lockup-day.svg'
-import lockupNight from './assets/adensa-lockup-night.svg'
+import { AdensaLogo } from './components/brand'
 import { NotificationsBell } from './components/NotificationsBell'
 // Route-level chunks: each page (and its heavy chart/map vendor code) loads
 // only when navigated to, so the first paint ships the shell alone.
@@ -74,15 +75,36 @@ const KEY_BY_PATH: Record<string, NavKey> = Object.fromEntries(
   Object.entries(PATH_BY_KEY).map(([key, path]) => [path, key as NavKey]),
 )
 
-const NAV: { key: NavKey; label: string; icon: LucideIcon }[] = [
-  { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { key: 'suppliers', label: 'Suppliers', icon: Truck },
-  { key: 'customers', label: 'Customers', icon: Users },
-  { key: 'compare', label: 'Compare quotes', icon: Scale },
-  { key: 'quotes', label: 'Quote builder', icon: FileText },
-  { key: 'orders', label: 'Orders', icon: Tag },
-  { key: 'cash', label: 'Cash tracker', icon: Wallet },
+interface NavItem {
+  key: NavKey
+  label: string
+  icon: LucideIcon
+}
+
+/** Slim grouped navigation: the order operators actually work in. */
+const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
+  {
+    label: 'Operate',
+    items: [
+      { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+      { key: 'orders', label: 'Orders', icon: Package },
+      { key: 'quotes', label: 'Quotes', icon: FileText },
+    ],
+  },
+  {
+    label: 'Source',
+    items: [
+      { key: 'suppliers', label: 'Suppliers', icon: Truck },
+      { key: 'compare', label: 'Compare prices', icon: Scale },
+    ],
+  },
+  { label: 'Money', items: [{ key: 'cash', label: 'Cash', icon: Wallet }] },
+  { label: 'People', items: [{ key: 'customers', label: 'Customers', icon: Users }] },
 ]
+
+const NAV: (NavItem & { group: string })[] = NAV_GROUPS.flatMap((g) =>
+  g.items.map((item) => ({ ...item, group: g.label })),
+)
 
 /** Stored "real" only counts if this tab has passed the PIN gate. */
 function initialMode(): DataMode {
@@ -327,7 +349,7 @@ function AppInner() {
     // Slow smooth crossfade: a veil of the incoming canvas colour fades in,
     // the theme swaps underneath it at full cover, then the veil lifts.
     veil.style.transition = 'opacity 450ms ease'
-    veil.style.backgroundColor = next === 'dark' ? '#111111' : '#fafaf9'
+    veil.style.backgroundColor = next === 'dark' ? '#0A1220' : '#F6F5F1'
     veil.style.opacity = '1'
     window.setTimeout(() => {
       applyTheme(next)
@@ -398,7 +420,7 @@ function AppInner() {
         {/* Skip link: first tab stop, jumps over nav for keyboard users */}
         <a
           href="#main"
-          className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[80] focus:rounded-lg focus:bg-brand-600 focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-white"
+          className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[80] focus:rounded-lg focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-on-primary"
         >
           Skip to main content
         </a>
@@ -411,16 +433,15 @@ function AppInner() {
           />
         )}
 
-        {/* Sidebar — fixed drawer on mobile, static column from md up */}
-        {/* The rail is charcoal / near-black in BOTH themes — the anchor
-            of the orange identity (near-black rail, orange accents). */}
+        {/* Sidebar: fixed drawer on mobile, slim static column from md up.
+            Surface-coloured in light, navy surface under .dark. */}
         <aside
-          className={`fixed inset-y-0 left-0 z-40 flex w-64 shrink-0 flex-col border-r border-rail-line bg-rail text-rail-ink-soft transition-all duration-200 md:static md:w-60 md:translate-x-0 ${
+          className={`fixed inset-y-0 left-0 z-40 flex w-60 shrink-0 flex-col border-r border-rail-line bg-rail text-rail-ink-soft transition-transform duration-200 md:sticky md:top-0 md:h-screen md:w-56 md:translate-x-0 ${
             navOpen ? 'translate-x-0' : '-translate-x-full'
           }`}
         >
-          <div className="flex items-start justify-between gap-2.5 border-b border-rail-line px-5 py-4">
-            {/* Brand lockup: day/night image follows the theme; click returns home */}
+          <div className="flex h-14 items-center justify-between gap-2 px-4">
+            {/* Brand logo: returns to the dashboard. Not a button visually. */}
             <div
               role="button"
               tabIndex={0}
@@ -431,186 +452,170 @@ function AppInner() {
                   setPage('dashboard')
                 }
               }}
-              title="Back to dashboard"
+              title="Dashboard"
               aria-label="AdensaOps, back to dashboard"
-              className="min-w-0 cursor-pointer rounded-lg transition-opacity duration-200 hover:opacity-75 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
+              className="flex h-8 min-w-0 items-center rounded transition-opacity duration-200 hover:opacity-75 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
             >
-              {/* w-full + max-w so the lockup shrinks beside the toggle buttons
-                  instead of overlapping them (on a phone the old fixed w-40 sat
-                  on top of the theme toggle and swallowed every tap on it). */}
-              <div className="relative aspect-[410/150] w-full max-w-40">
-                {/* The rail stays charcoal in both themes, so the night
-                    (cream) lockup is always the right one here. */}
-                <img
-                  src={lockupNight}
-                  alt="Adensa"
-                  className="absolute inset-0 h-full w-full object-contain object-left"
-                />
-              </div>
-              <span className="mt-1.5 block text-[10px] text-rail-ink-soft">
-                Your project, Our Procurement.
-              </span>
+              <AdensaLogo className="h-8" />
             </div>
-            {/* z-10 keeps these tappable above the lockup image at any width */}
             <div className="relative z-10 flex shrink-0 items-center gap-1">
               <button
                 onClick={toggleTheme}
                 aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
                 title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
-                className="flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-full text-rail-ink-soft transition hover:bg-rail-soft hover:text-white sm:hidden"
+                className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-rail-ink-soft transition hover:bg-rail-soft hover:text-rail-ink sm:hidden"
               >
                 {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
               </button>
               <button
                 onClick={() => setNavOpen(false)}
                 aria-label="Close navigation"
-                className="flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-full text-rail-ink-soft transition hover:bg-rail-soft hover:text-white md:hidden"
+                className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-rail-ink-soft transition hover:bg-rail-soft hover:text-rail-ink md:hidden"
               >
                 <X size={18} />
               </button>
             </div>
           </div>
-          <nav className="flex-1 space-y-1 px-3 py-4">
-            {NAV.map((item) => {
-              const active = page === item.key
-              const Icon = item.icon
-              return (
-                <button
-                  key={item.key}
-                  onClick={() => setPage(item.key)}
-                  aria-current={active ? 'page' : undefined}
-                  className={`flex min-h-11 w-full items-center gap-2.5 rounded-full px-4 py-2 text-left text-sm transition ${
-                    active
-                      ? 'bg-brand-600 font-medium text-white'
-                      : 'text-rail-ink-soft hover:bg-rail-soft hover:text-rail-ink'
-                  }`}
-                >
-                  <Icon size={16} className={active ? 'text-white' : 'text-rail-ink-soft'} />
-                  {item.label}
-                </button>
-              )
-            })}
+          <nav aria-label="Main" className="flex-1 space-y-5 overflow-y-auto px-3 py-3">
+            {NAV_GROUPS.map((group) => (
+              <div key={group.label}>
+                <div className="px-2.5 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-rail-ink-soft">
+                  {group.label}
+                </div>
+                <ul className="space-y-0.5">
+                  {group.items.map((item) => {
+                    const active = page === item.key
+                    const Icon = item.icon
+                    return (
+                      <li key={item.key}>
+                        <button
+                          onClick={() => setPage(item.key)}
+                          aria-current={active ? 'page' : undefined}
+                          className={`relative flex min-h-9 w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[13px] transition ${
+                            active
+                              ? 'bg-rail-soft font-medium text-rail-ink'
+                              : 'text-rail-ink-soft hover:bg-rail-soft hover:text-rail-ink'
+                          }`}
+                        >
+                          {active && (
+                            <span
+                              aria-hidden="true"
+                              className="absolute inset-y-1.5 left-0 w-0.5 rounded-full bg-brand-400"
+                            />
+                          )}
+                          <Icon size={15} className={active ? 'text-rail-ink' : 'text-rail-ink-soft'} />
+                          {item.label}
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
+              </div>
+            ))}
           </nav>
-          <div className="border-t border-rail-line px-5 py-4 text-[10px] leading-relaxed text-rail-ink-soft">
+          <div className="border-t border-rail-line px-5 py-3 text-[10px] leading-relaxed text-rail-ink-soft">
             Adensa Supply &amp; Logistics Ltd.
           </div>
         </aside>
 
         {/* Main */}
         <div className="flex min-w-0 flex-1 flex-col">
-          {/* Top bar: menu + title + date + controls */}
-          <header className="flex items-center justify-between gap-1.5 border-b border-line bg-surface px-3 py-3 sm:gap-3 sm:px-6">
+          {/* Top bar: breadcrumbs, search, mode switch, notifications, New quote */}
+          <header className="sticky top-0 z-20 flex h-14 items-center justify-between gap-2 border-b border-line bg-surface/95 px-3 backdrop-blur sm:gap-3 sm:px-6">
             <div className="flex min-w-0 flex-1 items-center gap-1.5 sm:gap-3">
               <button
                 onClick={() => setNavOpen(true)}
                 aria-label="Open navigation"
-                className="flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-lg border border-line-strong text-ink-soft transition hover:bg-subtle md:hidden"
+                className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-ink-soft transition hover:bg-subtle md:hidden"
               >
                 <Menu size={18} />
               </button>
-              <div
-                role="button"
-                tabIndex={0}
-                onClick={() => setPage('dashboard')}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault()
-                    setPage('dashboard')
-                  }
-                }}
-                title="Back to dashboard"
-                aria-label="AdensaOps, back to dashboard"
-                className="relative hidden aspect-[410/150] h-7 shrink-0 cursor-pointer rounded transition-opacity duration-200 hover:opacity-75 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 sm:block md:hidden"
-              >
-                <img
-                  src={lockupNight}
-                  alt=""
-                  aria-hidden="true"
-                  className={`absolute inset-0 h-full w-full object-contain object-left transition-opacity duration-200 ${
-                    theme === 'dark' ? 'opacity-100' : 'opacity-0'
-                  }`}
-                />
-                <img
-                  src={lockupDay}
-                  alt="Adensa"
-                  className={`absolute inset-0 h-full w-full object-contain object-left transition-opacity duration-200 ${
-                    theme === 'dark' ? 'opacity-0' : 'opacity-100'
-                  }`}
-                />
-              </div>
-              <div className="min-w-0 flex-1">
-                <h1 className="truncate text-[13px] font-semibold text-ink sm:text-base">
-                  {NAV.find((n) => n.key === page)?.label}
-                </h1>
-                <p className="hidden text-[11px] text-ink-faint sm:block">
-                  {new Date().toLocaleDateString('en-GB', {
-                    weekday: 'long',
-                    day: 'numeric',
-                    month: 'long',
-                    year: 'numeric',
-                  })}
-                </p>
-              </div>
+              <nav aria-label="Breadcrumb" className="min-w-0">
+                <ol className="flex min-w-0 items-center gap-1.5 text-[13px]">
+                  <li className="hidden shrink-0 text-ink-faint sm:block">
+                    {NAV.find((n) => n.key === page)?.group}
+                  </li>
+                  <li aria-hidden="true" className="hidden text-ink-faint sm:block">
+                    <ChevronRight size={13} />
+                  </li>
+                  <li className="min-w-0">
+                    <h1 aria-current="page" className="truncate text-[13px] font-semibold text-ink">
+                      {NAV.find((n) => n.key === page)?.label}
+                    </h1>
+                  </li>
+                </ol>
+              </nav>
             </div>
-            <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-              {/* Search trigger for the command palette */}
+            <div className="flex shrink-0 items-center gap-1.5 sm:gap-2.5">
+              {/* Search or jump to: opens the command palette */}
               <button
                 ref={paletteTriggerRef}
                 onClick={() => setPaletteOpen(true)}
-                aria-label="Search (Command K)"
-                title="Search · Ctrl+K"
-                className="hidden min-h-11 min-w-11 items-center justify-center gap-2 rounded-full border border-line-strong bg-surface px-3 text-ink-soft transition hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700 sm:flex lg:min-w-auto lg:justify-start lg:px-4 dark:hover:border-brand-700 dark:hover:bg-brand-950/50 dark:hover:text-brand-200"
+                aria-label="Search or jump to (Ctrl K)"
+                title="Search or jump to · Ctrl+K"
+                className="hidden h-9 items-center gap-2 rounded-lg border border-line bg-canvas px-2.5 text-ink-faint transition hover:border-line-strong hover:text-ink sm:flex lg:w-64"
               >
-                <Search size={16} aria-hidden="true" />
-                <span className="hidden text-xs lg:inline">Search</span>
+                <Search size={15} aria-hidden="true" />
+                <span className="hidden flex-1 text-left text-xs lg:inline">Search or jump to</span>
+                <kbd className="hidden rounded border border-line bg-surface px-1.5 py-0.5 font-sans text-[10px] font-medium text-ink-faint lg:inline">
+                  Ctrl K
+                </kbd>
               </button>
-              {/* Theme toggle — night shift mode */}
               <button
                 onClick={toggleTheme}
                 aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
                 title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
-                className="hidden min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-full border border-line-strong bg-surface text-ink-soft transition hover:bg-subtle hover:text-ink sm:flex"
+                className="hidden h-9 w-9 items-center justify-center rounded-lg text-ink-soft transition hover:bg-subtle hover:text-ink sm:flex"
               >
                 {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
               </button>
-              <span className="hidden text-xs font-medium text-ink-faint sm:inline">Data mode</span>
-              <div className="flex overflow-hidden rounded-full border border-line-strong text-xs font-medium shadow-sm">
+              {/* Demo / Real data switch */}
+              <div
+                role="group"
+                aria-label="Data mode"
+                className="flex h-9 items-center rounded-lg border border-line bg-canvas p-0.5 text-xs font-medium"
+              >
                 <button
                   onClick={() => changeMode('demo')}
-                  className={`min-h-11 px-2 transition sm:px-4 ${
+                  aria-pressed={mode === 'demo'}
+                  className={`h-full rounded-md px-2.5 transition sm:px-3 ${
                     mode === 'demo'
-                      ? 'bg-brand-600 text-white'
-                      : 'bg-surface text-ink-soft hover:bg-subtle'
+                      ? 'bg-surface text-ink shadow-sm ring-1 ring-line'
+                      : 'text-ink-faint hover:text-ink'
                   }`}
                 >
                   Demo
                 </button>
                 <button
                   onClick={() => changeMode('real')}
+                  aria-pressed={mode === 'real'}
                   title={realLocked ? 'Real records are PIN-protected' : 'Real operational records'}
-                  className={`flex min-h-11 items-center gap-1.5 px-2 transition sm:px-4 ${
+                  className={`flex h-full items-center gap-1 rounded-md px-2.5 transition sm:px-3 ${
                     mode === 'real'
-                      ? 'bg-amber-700 text-white'
-                      : 'bg-surface text-ink-soft hover:bg-subtle'
+                      ? 'bg-surface text-ink shadow-sm ring-1 ring-line'
+                      : 'text-ink-faint hover:text-ink'
                   }`}
                 >
-                  {realLocked && <Lock size={11} />}
+                  {realLocked && <Lock size={11} aria-hidden="true" />}
                   Real
                 </button>
               </div>
-              {/* Notifications - top-right corner; Demo shows the simulated feed */}
+              {/* Notifications: Demo shows the simulated feed */}
               <NotificationsBell
                 items={notifItems}
                 state={notifState}
                 onNavigate={(target) => setPage(target)}
                 open={notifOpen}
                 setOpen={setNotifOpen}
-                emptyNote={
-                  mode === 'real'
-                    ? 'Live system events will appear once activity is recorded.'
-                    : undefined
-                }
+                emptyNote={mode === 'real' ? 'Live system events will appear once activity is recorded.' : undefined}
               />
+              <button
+                onClick={() => setPage('quotes')}
+                className="hidden h-9 items-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-semibold text-on-primary transition hover:bg-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 focus-visible:ring-offset-surface sm:inline-flex"
+              >
+                <Plus size={14} aria-hidden="true" />
+                New quote
+              </button>
             </div>
           </header>
 
@@ -621,10 +626,11 @@ function AppInner() {
             {page === 'dashboard' && (
               <DashboardPage
                 data={data}
-                mode={mode}
-                unreadCount={notifState.unreadCount}
-                onOpenSearch={() => setPaletteOpen(true)}
                 onNavigate={(target) => setPage(target)}
+                onOpenOrder={(orderId) => {
+                  setPendingOrderId(orderId)
+                  setPage('orders')
+                }}
               />
             )}
             {page === 'suppliers' && <SuppliersPage data={data} />}
@@ -693,7 +699,7 @@ function AppInner() {
           className="w-[calc(100%-2rem)] gap-0"
         >
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-warning-soft text-warning">
               <Lock size={18} />
             </div>
             <div>
@@ -716,7 +722,7 @@ function AppInner() {
                 aria-label="Admin PIN"
                 className={`w-full rounded-lg border bg-canvas px-3 py-2.5 pr-10 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 ${
                   pinError
-                    ? 'border-rose-400 focus:ring-rose-300'
+                    ? 'border-danger/40 focus:ring-danger/40'
                     : 'border-line-strong focus:ring-brand-300'
                 }`}
               />
@@ -730,7 +736,7 @@ function AppInner() {
                 {pinVisible ? <EyeOff size={15} /> : <Eye size={15} />}
               </button>
             </div>
-            {pinError && <p className="mt-2 text-xs text-rose-600 dark:text-rose-400">{pinError}</p>}
+            {pinError && <p className="mt-2 text-xs text-danger">{pinError}</p>}
             <div className="mt-4 flex justify-end gap-2">
               <button
                 type="button"
@@ -742,7 +748,7 @@ function AppInner() {
               <button
                 type="submit"
                 disabled={pinChecking || pinValue.length === 0}
-                className="rounded-lg bg-brand-600 px-4 py-2 text-xs font-medium text-white transition hover:bg-brand-700 disabled:opacity-50"
+                className="rounded-lg bg-primary px-4 py-2 text-xs font-medium text-on-primary transition hover:bg-primary-hover disabled:opacity-50"
               >
                 {pinChecking ? 'Checking…' : 'Unlock'}
               </button>
