@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Generate every static brand asset from one geometry definition:
 //   public/favicon.svg, favicon-16/32/512.png, apple-touch-icon.png,
-//   favicon.ico, and the day/night lockups in public/brand/.
+//   favicon.ico, the day/night lockups in public/brand/ and the social
+//   preview card public/og-image.png.
 //
 // Usage:  npm run brand:assets
 //
@@ -108,6 +109,48 @@ async function rasterise(svg, size) {
   }
 }
 
+/** Social preview card (Open Graph / Twitter), 1200x630. */
+export function ogHtml() {
+  const font = (pkg, file) => join(root, 'node_modules', '@fontsource', pkg, 'files', file)
+  return `<!doctype html><html><head><style>
+  @font-face { font-family: Inter; font-weight: 500; src: url(file://${font('inter', 'inter-latin-500-normal.woff2')}); }
+  @font-face { font-family: Inter; font-weight: 600; src: url(file://${font('inter', 'inter-latin-600-normal.woff2')}); }
+  @font-face { font-family: Poppins; font-weight: 700; src: url(file://${font('poppins', 'poppins-latin-700-normal.woff2')}); }
+  html, body { margin: 0; width: 1200px; height: 630px; }
+  body { background: #0A1220; color: #F6F2EA; font-family: Inter, sans-serif; display: flex; align-items: center; }
+  .wrap { padding: 0 96px; display: flex; flex-direction: column; gap: 28px; }
+  .lockup { display: flex; align-items: center; gap: 22px; }
+  .word { font-family: Poppins; font-weight: 700; font-size: 44px; letter-spacing: 0.14em; }
+  .desc { font-family: Poppins; font-weight: 700; font-size: 13px; letter-spacing: 0.32em; color: ${BRAND.gold}; margin-top: 6px; }
+  h1 { margin: 12px 0 0; font-weight: 600; font-size: 72px; letter-spacing: -0.03em; line-height: 1.02; }
+  p { margin: 0; font-weight: 500; font-size: 26px; color: #9AA6B8; }
+  .tag { display: inline-block; margin-top: 8px; padding: 10px 18px; border: 1px solid #1E2C43; border-radius: 999px; font-size: 20px; color: #C1CAD6; }
+  </style></head><body><div class="wrap">
+  <div class="lockup">
+    <svg width="96" height="88" viewBox="140 160 360 330">${markShapes(BRAND.ivory)}</svg>
+    <div><div class="word">ADENSA</div><div class="desc">SUPPLY &amp; LOGISTICS</div></div>
+  </div>
+  <h1>Your project.<br/>Our procurement.</h1>
+  <p>AdensaOps · operations and procurement platform</p>
+  <div><span class="tag">React · TypeScript · Cloudflare D1</span></div>
+  </div></body></html>`
+}
+
+async function renderOg() {
+  const { chromium } = await import('@playwright/test')
+  const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {})
+  try {
+    const page = await browser.newPage({ viewport: { width: 1200, height: 630 } })
+    const tmp = join(root, 'node_modules', '.og-card.html')
+    writeFileSync(tmp, ogHtml())
+    await page.goto(`file://${tmp}`)
+    await page.evaluate(() => document.fonts.ready)
+    return await page.screenshot({ type: 'png' })
+  } finally {
+    await browser.close()
+  }
+}
+
 async function main() {
   const icon = iconSvg()
   writeFileSync(join(pub, 'favicon.svg'), icon)
@@ -130,6 +173,7 @@ async function main() {
       { size: 48, png: png48 },
     ]),
   )
+  writeFileSync(join(pub, 'og-image.png'), await renderOg())
   console.log('Brand assets written to public/.')
 }
 

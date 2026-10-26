@@ -12,6 +12,7 @@ import { FileText, Search, Truck, Users } from 'lucide-react'
 import type { Dataset } from '../lib/dataSource'
 import type { NotificationTarget } from '../lib/notifications'
 import { useFocusTrap } from '../lib/a11y'
+import { formatGhs } from '../lib/format'
 
 interface PaletteEntry {
   id: string
@@ -112,7 +113,7 @@ export function CommandPalette({
       id: `quo-${q.id}`,
       group: 'Quotes',
       label: `${q.id} · ${data.customers.find((c) => c.id === q.customerId)?.name ?? 'Customer'}`,
-      hint: `GH₵${q.valueGhs.toLocaleString('en-GB')} · ${q.status}`,
+      hint: `${formatGhs(q.valueGhs)} · ${q.status}`,
       run: go('quotes'),
     }))
 
@@ -120,7 +121,7 @@ export function CommandPalette({
       id: `ord-${o.id}`,
       group: 'Orders',
       label: `${o.id} · ${data.customers.find((c) => c.id === o.customerId)?.name ?? 'Customer'}`,
-      hint: `GH₵${o.valueGhs.toLocaleString('en-GB')} · ${o.stage}`,
+      hint: `${formatGhs(o.valueGhs)} · ${o.stage}`,
       run: go('orders', o.id),
     }))
 

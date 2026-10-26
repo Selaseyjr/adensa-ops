@@ -42,6 +42,7 @@ import { real } from './data/real'
 import { daysSince, type CashEntry, type Customer, type Order, type Quote, type QuoteStatus } from './types'
 import { AdensaLogo } from './components/brand'
 import { NotificationsBell } from './components/NotificationsBell'
+import { AboutProjectDialog, AppFooter, hasSeenAbout } from './components/AboutProject'
 // Route-level chunks: each page (and its heavy chart/map vendor code) loads
 // only when navigated to, so the first paint ships the shell alone.
 const DashboardPage = lazy(() => import('./pages/DashboardPage').then((m) => ({ default: m.DashboardPage })))
@@ -128,6 +129,8 @@ function AppInner() {
   const [notifOpen, setNotifOpen] = useState(false)
   const toast = useToast()
   const [paletteOpen, setPaletteOpen] = useState(false)
+  // About this project: opens by itself on a first visit only.
+  const [aboutOpen, setAboutOpen] = useState(() => !hasSeenAbout())
   const paletteTriggerRef = useRef<HTMLButtonElement>(null)
   // Cross-page handoff: the quote builder's View action opens that order's
   // detail popup on the Orders page (consumed once by OrdersPage).
@@ -667,9 +670,12 @@ function AppInner() {
             )}
             </Suspense>
             </ErrorBoundary>
+            <AppFooter onAbout={() => setAboutOpen(true)} />
           </main>
         </div>
       </div>
+
+      <AboutProjectDialog open={aboutOpen} onClose={() => setAboutOpen(false)} />
 
       {/* Theme crossfade veil — sits above all, invisible except mid-swap */}
       <div id="theme-veil" aria-hidden="true" />
@@ -704,7 +710,7 @@ function AppInner() {
             </div>
             <div>
               <DialogTitle>
-                Real data is protected<span className="sr-only"> — enter PIN</span>
+                Real data is protected<span className="sr-only">. Enter PIN</span>
               </DialogTitle>
               <DialogDescription>Enter the admin PIN to view private records.</DialogDescription>
             </div>
