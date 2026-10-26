@@ -377,7 +377,7 @@ export const STAGE_COLORS: Record<OrderStage, string> = {
   settled: 'var(--color-stage-settled)',
 }
 
-export const IN_MOTION_STAGES: OrderStage[] = ['deposit', 'ordered', 'delivered']
+export { IN_MOTION_STAGES } from '../lib/metrics'
 
 export interface AttentionItem {
   key: string

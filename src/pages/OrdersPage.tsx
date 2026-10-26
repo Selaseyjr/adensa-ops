@@ -53,7 +53,8 @@ import {
 import type { OrderOverride } from '../lib/localData'
 import { localDate } from '../lib/localData'
 import { balanceDue, cashReceived, orderFlags, type RuleContext } from '../lib/rules'
-import { ghs, IN_MOTION_STAGES, KpiDetailModal, RuleFlagChips, STAGE_COLORS, StatCard } from './shared'
+import { computeMetrics } from '../lib/metrics'
+import { ghs, KpiDetailModal, RuleFlagChips, STAGE_COLORS, StatCard } from './shared'
 
 const MIN_W = 'min-w-[880px]'
 
@@ -67,12 +68,6 @@ type Panel = 'none' | 'deposit' | 'payment' | 'delivery' | 'settle' | 'edit'
 // Deposit plus recorded balance payments: what the customer has actually paid.
 const paidOf = (o: Order, cash: CashEntry[]): number => cashReceived(o, cash)
 const balanceOf = (o: Order, cash: CashEntry[]): number => balanceDue(o, cash)
-
-/** Late = promised date passed while we still owe the customer goods. */
-function isLate(o: Order, today: string): boolean {
-  if (o.stage !== 'deposit' && o.stage !== 'ordered') return false
-  return !!o.expectedDelivery && o.expectedDelivery < today
-}
 
 function customerName(o: Order, customers: Customer[]): string {
   return customers.find((c) => c.id === o.customerId)?.name ?? 'Customer'
@@ -471,14 +466,12 @@ export function OrdersPage({
 
   const open = openOrder
   const balance = open ? balanceOf(open, data.cash) : 0
-  const lateCount = data.orders.filter((o) => isLate(o, today)).length
+  // KPI figures come from the shared metric definitions (lib/metrics.ts),
+  // so they match the Dashboard and Cash pages exactly.
+  const metrics = computeMetrics(data, today)
+  const lateCount = metrics.orders.late.length
   const openFlags = open ? orderFlags(open, ruleCtx, today) : []
   const flaggedCount = matched.filter((o) => orderFlags(o, ruleCtx, today).length > 0).length
-  const inMotion = data.orders.filter((o) => IN_MOTION_STAGES.includes(o.stage))
-  const awaitingDeposit = data.orders.filter((o) => o.stage === 'quoted')
-  const balanceDue = data.orders
-    .filter((o) => o.stage === 'deposit' || o.stage === 'ordered' || o.stage === 'delivered')
-    .reduce((sum, o) => sum + balanceOf(o, data.cash), 0)
 
   return (
     <div className="space-y-5">
@@ -487,23 +480,27 @@ export function OrdersPage({
         <StatCard
           icon={Truck}
           tone={SUCCESS_BLUE}
-          label="In motion"
-          value={ghs(inMotion.reduce((s, o) => s + o.valueGhs, 0))}
-          sub={`${inMotion.length} orders at deposit → delivered`}
+          label="Orders in motion"
+          value={metrics.orders.inMotion.length}
+          sub={`${ghs(metrics.orders.inMotionValue)} · deposit paid to delivered`}
         />
         <StatCard
           icon={Banknote}
           tone={ALERT_AMBER}
           label="Awaiting deposit"
-          value={awaitingDeposit.length}
-          sub={`${ghs(awaitingDeposit.reduce((s, o) => s + o.valueGhs, 0))} quoted, cash not yet in`}
+          value={metrics.orders.awaitingDeposit.length}
+          sub={`${ghs(metrics.orders.awaitingDepositValue)} accepted, deposit not yet in`}
         />
         <StatCard
           icon={Wallet}
           tone="var(--color-brand-600)"
-          label="Balance due"
-          value={ghs(balanceDue)}
-          sub="Collect on or before delivery"
+          label="Still to collect"
+          value={ghs(metrics.money.stillToCollect)}
+          sub={
+            metrics.money.overdueBalance > 0
+              ? `${ghs(metrics.money.overdueBalance)} overdue after offloading`
+              : 'Due before offloading'
+          }
         />
         <StatCard
           icon={AlertTriangle}
