@@ -2,8 +2,14 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
+// Local API: `npx wrangler dev` serves the worker on :8787; run
+// `API_PROXY=http://localhost:8787 npm run dev` to use it from the Vite app
+// (same-origin /api, exactly like the Vercel rewrite in production).
+const apiProxy = process.env.API_PROXY
+
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  server: apiProxy ? { proxy: { '/api': { target: apiProxy, changeOrigin: true } } } : undefined,
   build: {
     rollupOptions: {
       output: {

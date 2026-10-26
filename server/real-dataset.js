@@ -1,4 +1,3 @@
-import type { Dataset } from '../lib/dataSource'
 
 /**
  * REAL dataset — private. Never screenshot, never publish.
@@ -9,7 +8,10 @@ import type { Dataset } from '../lib/dataSource'
  * Prices are market_reference observations only — no quoted prices exist yet;
  * those are captured when Adensa actually contacts suppliers.
  */
-export const real: Dataset = {
+// Served only by the worker (GET /api/real-dataset) to a PIN-verified session.
+// This file is never imported by the frontend, so it is not in the JS bundle.
+/** @type {import('../src/lib/dataSource').Dataset} */
+const realDataset = {
   suppliers: [
     // --- Cement & building materials ---
     {
@@ -458,3 +460,5 @@ export const real: Dataset = {
   cash: [],
   meta: { month: '2026-10', revenueTargetGhs: 0, openingCashGhs: 0 },
 }
+
+export default realDataset

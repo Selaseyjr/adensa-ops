@@ -207,7 +207,7 @@ export function DashboardPage({
         items.push({
           key: `r-${o.id}-${f.key}`,
           tone: f.tone === 'danger' ? 'rose' : 'amber',
-          icon: f.key === 'late' ? Clock : f.key === 'stale_price' ? AlertTriangle : Wallet,
+          icon: f.key === 'late' || f.key === 'quote_expiring' ? Clock : f.key === 'stale_price' ? AlertTriangle : Wallet,
           text: `${o.id} · ${f.label}`,
           age: f.short,
           target: 'orders',

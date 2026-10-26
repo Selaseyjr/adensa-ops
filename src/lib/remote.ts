@@ -19,6 +19,7 @@
 //   unioned by id so records created on another device still arrive.
 
 import type { DataMode } from './dataSource'
+import { getRealToken } from './realAccess'
 import type { LocalRecords } from './localData'
 import { mergeRecords as mergeFn } from './localData'
 
@@ -34,6 +35,34 @@ const PUSH_DEBOUNCE_MS = 800
 
 function defaultSharedBase(): string {
   return import.meta.env.PROD ? SHARED_API : ''
+}
+
+/** Real records are private: send the PIN session token with them. */
+function authHeaders(mode: DataMode): Record<string, string> {
+  const token = mode === 'real' ? getRealToken() : null
+  return token ? { authorization: `Bearer ${token}` } : {}
+}
+
+/**
+ * Any other API endpoint (session, real dataset): same origin first (Vite
+ * proxy, the worker itself, or Vercel's /api rewrite), then the shared worker
+ * in production builds. A host that answers with the SPA's HTML is skipped.
+ */
+export async function apiRequest(path: string, init: RequestInit = {}): Promise<Response | null> {
+  if (typeof fetch !== 'function') return null
+  const shared = import.meta.env.PROD ? SHARED_API.replace(/\/api\/records$/, '') : ''
+  for (const origin of shared ? ['', shared] : ['']) {
+    try {
+      const res = await fetch(`${origin}${path}`, { cache: 'no-store', ...init })
+      const type = res.headers.get('content-type') ?? ''
+      // Our API always answers JSON (errors included); HTML means "not this host".
+      if (!type.includes('application/json')) continue
+      return res
+    } catch {
+      continue
+    }
+  }
+  return null
 }
 
 /** Base URL that last answered with API JSON, so later calls skip the dead host. */
@@ -68,7 +97,7 @@ export async function fetchRemoteRecords(
   for (const base of bases(sharedBase)) {
     try {
       const res = await fetch(`${base}?mode=${mode}`, {
-        headers: { accept: 'application/json' },
+        headers: { accept: 'application/json', ...authHeaders(mode) },
         cache: 'no-store',
       })
       // A host without the worker API serves index.html (200 HTML) or 404 —
@@ -97,7 +126,7 @@ export async function pushRecords(
     try {
       const res = await fetch(`${base}?mode=${mode}`, {
         method: 'PUT',
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', ...authHeaders(mode) },
         body: JSON.stringify(records),
       })
       if (!isApiJson(res)) continue

@@ -1,19 +1,13 @@
-# AdensaOps CI — the gate that was always promised but never existed.
+# AdensaOps CI: the same gates a contributor runs locally.
 #
-# Three gates run exactly what the local workflow uses:
-#   1. build   = tsc --noEmit && vite build (a push can never reach Vercel
-#                with a broken typecheck or a build that produces no dist/)
-#   2. unit    = Vitest (68 unit/component tests: simulation engine, merge
-#                authority, notifications, theme, local records, bell UX,
-#                D1 worker API, local-first sync)
-#   3. e2e     = Playwright on Chromium in desktop/phone/tablet projects
-#                (36 tests: theme on mobile widths, live simulation cadence,
-#                bell UX, console-clean navigation on every route)
+#   1. build = tsc --noEmit && vite build && bundle privacy check (the real
+#              dataset and PIN hash must never reach dist/)
+#   2. unit  = Vitest: business rules, shared metrics, compare and quote maths,
+#              components, worker API (sessions, real dataset, records)
+#   3. e2e   = Playwright on Chromium in desktop/phone/tablet projects
 #
-# Total: 104 tests.
-#
-# npm ci honors the lockfile exactly — no drift between what was tested and
-# what ships.
+# npm ci honors the lockfile exactly: no drift between what was tested and
+# what ships. Vercel additionally refuses to deploy unless npm test passes.
 
 name: CI
 

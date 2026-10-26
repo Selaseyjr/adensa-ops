@@ -16,7 +16,18 @@ export interface D1Like {
 export interface WorkerEnv {
   DB: D1Like
   ASSETS: { fetch(request: Request): Promise<Response> }
+  /** PBKDF2-SHA256 hash of the Real-mode PIN (hex); falls back to server/pin-hash.js. */
+  REAL_PIN_HASH?: string
+  REAL_PIN_SALT?: string
+  REAL_PIN_ITERATIONS?: string
+  /** HMAC key for session tokens; derived from the PIN hash when unset. */
+  SESSION_SECRET?: string
 }
+
+type PartialEnv = Partial<Pick<WorkerEnv, 'REAL_PIN_HASH' | 'REAL_PIN_SALT' | 'REAL_PIN_ITERATIONS' | 'SESSION_SECRET'>>
+
+export function issueToken(env: PartialEnv, now?: number): Promise<{ token: string; expiresAt: number }>
+export function verifyToken(env: PartialEnv, token: string | null, now?: number): Promise<boolean>
 
 declare const worker: {
   fetch(request: Request, env: WorkerEnv): Promise<Response>

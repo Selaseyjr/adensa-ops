@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 // Regenerate the Real-mode PIN hash.
 // Usage:  npm run set-pin            (prompts, hides input)
-// Writes src/lib/pin.secret.ts with a fresh salt + PBKDF2-SHA256 hash.
+// Writes server/pin-hash.js (read by the worker, never shipped to browsers)
+// with a fresh salt + PBKDF2-SHA256 hash. In production you can instead set
+// REAL_PIN_HASH / REAL_PIN_SALT as worker secrets (see README).
 // The PIN itself is never written to disk — only its hash.
 //
 // NOTE: the salt is passed to pbkdf2Sync as DECODED BYTES (Buffer.from hex),
@@ -64,20 +66,20 @@ if (confirm !== pin) {
 const salt = randomBytes(16);
 const hash = pbkdf2Sync(pin, salt, ITERATIONS, 32, 'sha256').toString('hex');
 
-const file = join(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'lib', 'pin.secret.ts');
+const file = join(dirname(fileURLToPath(import.meta.url)), '..', 'server', 'pin-hash.js');
 writeFileSync(
   file,
-  `// PIN gate for Real data mode — public build ships with the real dataset in
-// the bundle, so the toggle demands this PIN first. Only the PBKDF2 hash is
-// stored; the PIN itself never appears in source or the deployed JavaScript.
+  `// Real-mode PIN, verified server-side by the worker (POST /api/session).
+// Only the PBKDF2 hash is stored; the PIN itself never appears in source.
+// This module is imported by worker.js only, never by the frontend bundle.
 //
 // Regenerate after changing the PIN:  npm run set-pin
 // (see scripts/set-pin.mjs)
 
-export const PIN_SALT = '${salt.toString('hex')}';
-export const PIN_ITERATIONS = ${ITERATIONS.toLocaleString('en-US').replace(/,/g, '_')};
+export const PIN_SALT = '${salt.toString('hex')}'
+export const PIN_ITERATIONS = ${ITERATIONS.toLocaleString('en-US').replace(/,/g, '_')}
 export const PIN_HASH =
-  '${hash}';
+  '${hash}'
 `,
 );
 

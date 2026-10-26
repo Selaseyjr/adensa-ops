@@ -1,76 +1,90 @@
-// Real-mode access gate. The PIN check runs entirely in the browser against
-// a PBKDF2 hash (see pin.secret.ts); unlocking is remembered per tab session
-// (sessionStorage) so a refresh keeps working but a fresh visitor — or a new
-// tab — always hits the gate. This is a privacy speed bump for the public
-// deployment, not server-grade auth: the dataset still ships in the bundle.
+// Real-mode access. The PIN is verified by the worker (POST /api/session),
+// never in the browser, and the real dataset is fetched from the API with the
+// signed session token (GET /api/real-dataset). Nothing private ships in the
+// JS bundle. The token is kept per tab (sessionStorage), so a refresh keeps
+// working but a new tab or a fresh visitor always meets the PIN gate.
 
-import { PIN_HASH, PIN_ITERATIONS, PIN_SALT } from './pin.secret';
+import type { Dataset } from './dataSource'
+import { apiRequest } from './remote'
 
-const UNLOCK_KEY = 'adensa.realUnlocked';
+const SESSION_KEY = 'adensa.realSession'
 
-export function isRealUnlocked(): boolean {
-  if (typeof sessionStorage === 'undefined') return false;
-  return sessionStorage.getItem(UNLOCK_KEY) === '1';
+interface StoredSession {
+  token: string
+  expiresAt: number
 }
 
-export function unlockReal(): void {
+function readSession(): StoredSession | null {
   try {
-    sessionStorage.setItem(UNLOCK_KEY, '1');
+    const raw = sessionStorage.getItem(SESSION_KEY)
+    if (!raw) return null
+    const s = JSON.parse(raw) as StoredSession
+    if (typeof s?.token !== 'string' || typeof s.expiresAt !== 'number') return null
+    return s.expiresAt > Date.now() ? s : null
   } catch {
-    /* private mode — unlock still applies to this tab via state */
+    return null
   }
+}
+
+/** The signed session token, or null when Real mode is locked or expired. */
+export function getRealToken(): string | null {
+  return readSession()?.token ?? null
+}
+
+export function isRealUnlocked(): boolean {
+  return readSession() !== null
 }
 
 export function lockReal(): void {
   try {
-    sessionStorage.removeItem(UNLOCK_KEY);
+    sessionStorage.removeItem(SESSION_KEY)
   } catch {
     /* ignore */
   }
 }
 
-function hexToBytes(hex: string): Uint8Array {
-  const out = new Uint8Array(hex.length / 2);
-  for (let i = 0; i < out.length; i++) {
-    out[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+export type UnlockResult = 'ok' | 'wrong' | 'locked' | 'unavailable'
+
+/** Ask the worker to verify the PIN; stores the session token on success. */
+export async function unlockReal(pin: string): Promise<UnlockResult> {
+  if (!pin) return 'wrong'
+  const res = await apiRequest('/api/session', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ pin }),
+  })
+  if (!res) return 'unavailable'
+  if (res.status === 429) return 'locked'
+  if (!res.ok) return res.status === 401 || res.status === 400 ? 'wrong' : 'unavailable'
+  try {
+    const body = (await res.json()) as { ok?: boolean; token?: string; expiresAt?: number }
+    if (!body.ok || typeof body.token !== 'string' || typeof body.expiresAt !== 'number') return 'unavailable'
+    try {
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify({ token: body.token, expiresAt: body.expiresAt }))
+    } catch {
+      return 'unavailable'
+    }
+    return 'ok'
+  } catch {
+    return 'unavailable'
   }
-  return out;
 }
 
-/** PBKDF2-SHA256 verification — constant-work, no early exit. */
-export async function verifyPin(pin: string): Promise<boolean> {
-  if (typeof crypto === 'undefined' || !crypto.subtle) return false;
-  if (!pin) return false;
-
+/** The real dataset for an unlocked session; null if locked, expired or offline. */
+export async function fetchRealDataset(): Promise<Dataset | null> {
+  const token = getRealToken()
+  if (!token) return null
+  const res = await apiRequest('/api/real-dataset', { headers: { authorization: `Bearer ${token}` } })
+  if (!res) return null
+  if (res.status === 401) {
+    lockReal()
+    return null
+  }
+  if (!res.ok) return null
   try {
-    const key = await crypto.subtle.importKey(
-      'raw',
-      new TextEncoder().encode(pin),
-      'PBKDF2',
-      false,
-      ['deriveBits'],
-    );
-    const bits = await crypto.subtle.deriveBits(
-      {
-        name: 'PBKDF2',
-        salt: hexToBytes(PIN_SALT),
-        iterations: PIN_ITERATIONS,
-        hash: 'SHA-256',
-      },
-      key,
-      256,
-    );
-    const derived = [...new Uint8Array(bits)]
-      .map((b) => b.toString(16).padStart(2, '0'))
-      .join('');
-
-    // Constant-time-ish comparison.
-    let diff = 0;
-    for (let i = 0; i < PIN_HASH.length; i++) {
-      diff |= PIN_HASH.charCodeAt(i) ^ derived.charCodeAt(i);
-    }
-    return diff === 0;
+    const body = (await res.json()) as { ok?: boolean; dataset?: Dataset }
+    return body.ok && body.dataset ? body.dataset : null
   } catch {
-    return false;
+    return null
   }
 }
