@@ -21,14 +21,14 @@ import type { Dataset } from '../lib/dataSource'
 import type { NotificationTarget } from '../lib/notifications'
 import { CHART_AXIS, CHART_GRID, CHART_TOOLTIP_STYLE } from '../lib/colors'
 import { EmptyState } from '../components/states'
-import { orderFlags, quoteFlags } from '../lib/rules'
+import { cashReceived, orderFlags, quoteFlags } from '../lib/rules'
+import { cashOnHandAt, computeMetrics, inMotionAt, isCashIn, isoDay, stillToCollectAt } from '../lib/metrics'
 import {
   ORDER_STAGES,
   ORDER_STAGE_LABELS,
   PRICE_STALE_DAYS,
   daysSince,
   isPriceStale,
-  type CashEntry,
   type Order,
 } from '../types'
 import {
@@ -38,7 +38,6 @@ import {
   DetailEmpty,
   DetailTable,
   DetailTotals,
-  IN_MOTION_STAGES,
   KpiDetailKey,
   KpiDetailModal,
   STAGE_COLORS,
@@ -91,16 +90,6 @@ function weekStart(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate() - offset)
 }
 
-const isIn = (c: CashEntry) => c.kind === 'deposit_in' || c.kind === 'balance_in'
-
-/** Cash received against an order up to (and including) `asOf`. */
-function receivedFor(order: Order, cash: CashEntry[], asOf?: string): number {
-  const balances = cash
-    .filter((c) => c.orderId === order.id && c.kind === 'balance_in' && (!asOf || c.date <= asOf))
-    .reduce((s, c) => s + c.ghs, 0)
-  return Math.min(order.valueGhs, order.depositGhs + balances)
-}
-
 function ViewLink({ label, onClick }: { label: string; onClick: () => void }) {
   return (
     <button
@@ -138,41 +127,27 @@ export function DashboardPage({
     return { start: localIso(start), end: localIso(end), label: fmtDay(localIso(start)) }
   })
 
-  // ---- KPIs --------------------------------------------------------------
-  const inMotion = orders.filter((o) => IN_MOTION_STAGES.includes(o.stage))
-  const inMotionValue = inMotion.reduce((s, o) => s + o.valueGhs, 0)
-  const toCollect = inMotion.reduce((s, o) => s + Math.max(0, o.valueGhs - receivedFor(o, data.cash)), 0)
-
-  const isComplete = (o: Order) => o.stage === 'delivered' || o.stage === 'settled'
-  const revenueOrders = orders.filter((o) => isComplete(o) && (o.completedOn ?? '').startsWith(monthPrefix))
-  const revenue = revenueOrders.reduce((s, o) => s + o.valueGhs, 0)
-
-  const monthCash = data.cash.filter((c) => c.date.startsWith(monthPrefix))
-  const cashIn = monthCash.filter(isIn).reduce((s, c) => s + c.ghs, 0)
-  const cashOut = monthCash.filter((c) => !isIn(c)).reduce((s, c) => s + c.ghs, 0)
-  const cashAsOf = (iso: string) =>
-    data.meta.openingCashGhs +
-    monthCash.filter((c) => c.date <= iso).reduce((s, c) => s + (isIn(c) ? c.ghs : -c.ghs), 0)
-  const cashOnHand = data.meta.openingCashGhs + cashIn - cashOut
+  // ---- KPIs: every figure comes from the shared metric definitions -------
+  const m = computeMetrics(data)
+  const inMotion = m.orders.inMotion
+  const inMotionValue = m.orders.inMotionValue
+  const toCollect = m.money.stillToCollect
+  const revenueOrders = m.money.revenueOrders
+  const revenue = m.money.revenueMonth
+  const cashIn = m.money.cashInMonth
+  const cashOut = m.money.cashOutMonth
+  const cashOnHand = m.money.cashOnHand
 
   // Sparklines: each KPI re-evaluated at the end of each of the last 8 weeks.
+  const isComplete = (o: Order) => o.stage === 'delivered' || o.stage === 'settled'
   const sparkRevenue = weeks.map((w) =>
     orders
       .filter((o) => isComplete(o) && o.completedOn && o.completedOn >= w.start && o.completedOn <= w.end)
       .reduce((s, o) => s + o.valueGhs, 0),
   )
-  const inMotionAt = (iso: string) =>
-    orders.filter(
-      (o) =>
-        (IN_MOTION_STAGES.includes(o.stage) || o.stage === 'settled') &&
-        o.receivedOn <= iso &&
-        (o.stage !== 'settled' || (o.completedOn ?? '') > iso),
-    )
-  const sparkInMotion = weeks.map((w) => inMotionAt(w.end).length)
-  const sparkCollect = weeks.map((w) =>
-    inMotionAt(w.end).reduce((s, o) => s + Math.max(0, o.valueGhs - receivedFor(o, data.cash, w.end)), 0),
-  )
-  const sparkCash = weeks.map((w) => cashAsOf(w.end))
+  const sparkInMotion = weeks.map((w) => inMotionAt(orders, w.end).length)
+  const sparkCollect = weeks.map((w) => stillToCollectAt(orders, data.cash, w.end))
+  const sparkCash = weeks.map((w) => cashOnHandAt(data, w.end))
 
   const kpis: { key: KpiDetailKey; label: string; value: string; hint: string; spark: number[] }[] = [
     {
@@ -193,7 +168,10 @@ export function DashboardPage({
       key: 'collect',
       label: 'Still to collect',
       value: ghs(toCollect),
-      hint: `Across ${inMotion.length} open order${inMotion.length === 1 ? '' : 's'}`,
+      hint:
+        m.money.overdueBalance > 0
+          ? `${ghs(m.money.overdueBalance)} overdue after offloading`
+          : `Across ${m.money.collections.length} order${m.money.collections.length === 1 ? '' : 's'}`,
       spark: sparkCollect,
     },
     {
@@ -320,8 +298,8 @@ export function DashboardPage({
     const entries = data.cash.filter((c) => c.date >= w.start && c.date <= w.end)
     return {
       week: w.label,
-      in: entries.filter(isIn).reduce((s, c) => s + c.ghs, 0),
-      out: entries.filter((c) => !isIn(c)).reduce((s, c) => s + c.ghs, 0),
+      in: entries.filter(isCashIn).reduce((s, c) => s + c.ghs, 0),
+      out: entries.filter((c) => !isCashIn(c)).reduce((s, c) => s + c.ghs, 0),
     }
   })
   const cashWeeksEmpty = cashWeeks.every((w) => w.in === 0 && w.out === 0)
@@ -334,16 +312,24 @@ export function DashboardPage({
     .map((o) => ({
       order: o,
       customer: customerName(o.customerId),
-      outstanding: Math.max(0, o.valueGhs - receivedFor(o, data.cash)),
+      outstanding: Math.max(0, o.valueGhs - cashReceived(o, data.cash)),
       days: daysSince(o.receivedOn),
     }))
+  // Running balance over the whole ledger (like a bank statement), then the
+  // month's rows: the last balance always equals Cash on hand.
   let ledgerBalance = data.meta.openingCashGhs
-  const ledgerRunning = [...monthCash]
+  const ledgerRunning = [...data.cash]
+    .filter((c) => c.date <= m.asOf)
     .sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id))
     .map((entry) => {
-      ledgerBalance += isIn(entry) ? entry.ghs : -entry.ghs
-      return { entry, inflow: isIn(entry), running: ledgerBalance }
+      ledgerBalance += isCashIn(entry) ? entry.ghs : -entry.ghs
+      return { entry, inflow: isCashIn(entry), running: ledgerBalance }
     })
+    .filter((r) => r.entry.date.startsWith(monthPrefix))
+  const monthStartCash = cashOnHandAt(
+    data,
+    isoDay(new Date(Number(monthPrefix.slice(0, 4)), Number(monthPrefix.slice(5, 7)) - 1, 0)),
+  )
 
   return (
     <div className="mx-auto max-w-[1400px] space-y-5">
@@ -445,7 +431,7 @@ export function DashboardPage({
                 </thead>
                 <tbody>
                   {recentOrders.map((o) => {
-                    const balance = Math.max(0, o.valueGhs - receivedFor(o, data.cash))
+                    const balance = Math.max(0, o.valueGhs - cashReceived(o, data.cash))
                     return (
                       <tr
                         key={o.id}
@@ -600,10 +586,10 @@ export function DashboardPage({
                 <DetailTotals
                   items={[
                     { label: 'Revenue', value: ghs(revenue) },
-                    { label: 'Received', value: ghs(revenueOrders.reduce((s, o) => s + receivedFor(o, data.cash), 0)) },
+                    { label: 'Received', value: ghs(revenueOrders.reduce((s, o) => s + cashReceived(o, data.cash), 0)) },
                     {
                       label: 'Balance due',
-                      value: ghs(revenueOrders.reduce((s, o) => s + o.valueGhs - receivedFor(o, data.cash), 0)),
+                      value: ghs(revenueOrders.reduce((s, o) => s + o.valueGhs - cashReceived(o, data.cash), 0)),
                     },
                     { label: 'Orders', value: String(revenueOrders.length) },
                   ]}
@@ -617,7 +603,7 @@ export function DashboardPage({
                     { label: 'Balance due', right: true },
                   ]}
                   rows={revenueOrders.map((o) => {
-                    const due = o.valueGhs - receivedFor(o, data.cash)
+                    const due = o.valueGhs - cashReceived(o, data.cash)
                     return {
                       key: o.id,
                       cells: [
@@ -689,7 +675,7 @@ export function DashboardPage({
               <>
                 <DetailTotals
                   items={[
-                    { label: 'Opening', value: ghs(data.meta.openingCashGhs) },
+                    { label: 'Start of month', value: ghs(monthStartCash) },
                     { label: 'In', value: ghs(cashIn) },
                     { label: 'Out', value: ghs(cashOut) },
                     { label: 'On hand', value: ghs(cashOnHand) },

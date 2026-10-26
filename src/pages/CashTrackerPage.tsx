@@ -31,9 +31,10 @@ import { ALERT_AMBER, ALERT_ROSE, SUCCESS_BLUE } from '../lib/colors'
 import { ChartCard, DonutChart, type DonutSlice } from '../components/charts'
 import { EmptyState } from '../components/states'
 import { Pager, SortableTh, paginate, sortRows, useSort, type SortState } from '../components/table'
-import type { CashEntry, CashKind, Order } from '../types'
+import type { CashEntry, CashKind } from '../types'
 import { daysSince } from '../types'
 import { localDate } from '../lib/localData'
+import { computeMetrics } from '../lib/metrics'
 import { Sparkline } from './shared'
 import {
   CASH_KIND_LABELS,
@@ -63,17 +64,6 @@ const labelCls = 'block text-[11px] font-medium text-ink-soft'
 
 function isIn(kind: CashKind): boolean {
   return IN_KINDS.includes(kind)
-}
-
-/** Per-order cash received (all in-entries linked to it). */
-function receivedByOrder(entries: CashEntry[]): Map<string, number> {
-  const map = new Map<string, number>()
-  for (const c of entries) {
-    if (c.orderId && isIn(c.kind)) {
-      map.set(c.orderId, (map.get(c.orderId) ?? 0) + c.ghs)
-    }
-  }
-  return map
 }
 
 /* --------------------------- Record payment form --------------------------- */
@@ -290,9 +280,12 @@ export function CashTrackerPage({
     () => allEntries.filter((c) => c.date.startsWith(monthPrefix)),
     [allEntries, monthPrefix],
   )
-  const monthIn = monthEntries.filter((c) => isIn(c.kind)).reduce((s, c) => s + c.ghs, 0)
-  const monthOut = monthEntries.filter((c) => !isIn(c.kind)).reduce((s, c) => s + c.ghs, 0)
-  const available = data.meta.openingCashGhs + allEntries.reduce((s, c) => s + (isIn(c.kind) ? c.ghs : -c.ghs), 0)
+  // Headline figures come from the shared metric definitions (lib/metrics.ts)
+  // so they match the Dashboard and Orders pages exactly.
+  const metrics = computeMetrics(data)
+  const monthIn = metrics.money.cashInMonth
+  const monthOut = metrics.money.cashOutMonth
+  const available = metrics.money.cashOnHand
 
   // Running balance: computed once over ALL entries in date order from the
   // opening float, then attached to each entry — filters hide rows, they
@@ -352,16 +345,8 @@ export function CashTrackerPage({
   // Balance spark across the whole ledger (Dashboard parity).
   const spark = withBalance.map((r) => r.running)
 
-  // Collections: customers still owe on live orders (money the box will see).
-  const received = receivedByOrder(allEntries)
-  const collections = data.orders
-    .filter((o) => o.stage === 'deposit' || o.stage === 'ordered' || o.stage === 'delivered')
-    .map((o: Order) => {
-      const got = Math.min(received.get(o.id) ?? 0, o.valueGhs)
-      return { order: o, got, owed: o.valueGhs - got }
-    })
-    .filter((r) => r.owed > 0)
-    .sort((a, b) => b.owed - a.owed)
+  // Collections: balance due on orders in motion, overdue (delivered) first.
+  const collections = metrics.money.collections
 
   return (
     <div className="space-y-5">
@@ -370,9 +355,9 @@ export function CashTrackerPage({
         <StatCard
           icon={Wallet}
           tone={SUCCESS_BLUE}
-          label="Available now"
+          label="Cash on hand"
           value={ghs(available)}
-          sub={`Opening ${ghs(data.meta.openingCashGhs)} + all movements`}
+          sub="Opening float plus every movement to date"
         />
         <StatCard
           icon={ArrowDownLeft}
@@ -392,9 +377,12 @@ export function CashTrackerPage({
           icon={Banknote}
           tone={ALERT_ROSE}
           label="Still to collect"
-          value={ghs(collections.reduce((s, r) => s + r.owed, 0))}
-          sub={`Across ${collections.length} delivered or moving orders`}
-          alert={false}
+          value={ghs(metrics.money.stillToCollect)}
+          sub={
+            metrics.money.overdueBalance > 0
+              ? `${ghs(metrics.money.overdueBalance)} overdue after offloading`
+              : `Across ${collections.length} order${collections.length === 1 ? '' : 's'} in motion`
+          }
         />
       </div>
 
@@ -421,7 +409,7 @@ export function CashTrackerPage({
         <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
           <div>
             <h3 className="text-sm font-semibold text-ink">Still to collect</h3>
-            <p className="mt-0.5 text-xs text-ink-faint">Customer cash not yet in, oldest debt first</p>
+            <p className="mt-0.5 text-xs text-ink-faint">Balance due on orders in motion, overdue first</p>
           </div>
         </div>
         {collections.length === 0 ? (
@@ -439,7 +427,7 @@ export function CashTrackerPage({
                 </tr>
               </thead>
               <tbody>
-                {collections.map(({ order, got, owed }) => (
+                {collections.map(({ order, received: got, due: owed, overdue }) => (
                   <tr
                     key={order.id}
                     className="cursor-pointer border-b border-line transition last:border-0 hover:bg-subtle"
@@ -451,7 +439,15 @@ export function CashTrackerPage({
                     </td>
                     <td className="num px-4 py-2.5 text-right text-ink-soft">{ghs(got)}</td>
                     <td className="num px-4 py-2.5 text-right font-semibold text-ink">{ghs(owed)}</td>
-                    <td className="px-4 py-2.5 text-xs text-ink-faint">{daysSince(order.receivedOn)}d</td>
+                    <td className="px-4 py-2.5 text-xs text-ink-faint">
+                      {overdue ? (
+                        <span className="rounded-full bg-danger-soft px-2 py-0.5 text-[10px] font-medium text-danger">
+                          Overdue · delivered
+                        </span>
+                      ) : (
+                        `${daysSince(order.receivedOn)}d`
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>

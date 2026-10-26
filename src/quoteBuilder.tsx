@@ -555,7 +555,7 @@ function QuoteSheet({
 
 const FILTERS: { key: 'all' | QuoteStatus; label: string }[] = [
   { key: 'all', label: 'All' },
-  { key: 'sent', label: 'Awaiting' },
+  { key: 'sent', label: 'Awaiting response' },
   { key: 'accepted', label: 'Accepted' },
   { key: 'declined', label: 'Declined' },
   { key: 'expired', label: 'Expired' },

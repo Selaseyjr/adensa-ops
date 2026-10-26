@@ -91,6 +91,16 @@
   `deposit_in` cash entries). Every later payment is a `balance_in` cash
   entry only. Never add balance payments to `depositGhs`.
 
+## Metrics
+
+- Every figure that appears on more than one page comes from
+  `computeMetrics()` in `src/lib/metrics.ts` (definitions are in its header).
+  Never recompute "still to collect", "orders in motion", "awaiting deposit",
+  "quotes awaiting response", revenue or cash on hand inside a page.
+- Use the same label for the same metric everywhere. "Quotes awaiting
+  response" (customer has not answered) is not "Awaiting deposit" (customer
+  accepted, no deposit yet).
+
 ## Data mode
 
 - Demo mode shows simulated data, including the simulated notification feed.
