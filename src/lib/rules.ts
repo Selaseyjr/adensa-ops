@@ -16,6 +16,7 @@ import {
   type Price,
   type Quote,
 } from '../types'
+import { formatGhs } from './format'
 
 export const DEPOSIT_RATE = 0.7
 export const ESTABLISHED_DEPOSIT_RATE = 0.5
@@ -124,7 +125,7 @@ function expiryDetail(left: number): string {
 const expiryShort = (left: number) => (left < 0 ? 'Expired' : left === 0 ? 'Today' : `${left}d left`)
 
 const pct = (n: number) => `${Math.round(n * 100)}%`
-const money = (n: number) => `GH¢${n.toLocaleString('en-GH')}`
+const money = formatGhs
 
 /** Every rule an order currently breaks, most serious first. */
 export function orderFlags(order: Order, ctx: RuleContext, asOf: string = isoToday()): RuleFlag[] {

@@ -402,7 +402,7 @@ export function OrdersPage({
             orderId: o.id,
           },
         ],
-        message: `GH¢${amt.toLocaleString('en-GH')} deposit recorded for ${o.id}.`,
+        message: `${ghs(amt)} deposit recorded for ${o.id}.`,
       },
     )
     setPanel('none')
@@ -433,8 +433,8 @@ export function OrdersPage({
           },
         ],
         message: full
-          ? `${o.id} paid in full. Balance of GH¢${amt.toLocaleString('en-GH')} received.`
-          : `GH¢${amt.toLocaleString('en-GH')} recorded. ${ghs(remaining - amt)} still due on ${o.id}.`,
+          ? `${o.id} paid in full. Balance of ${ghs(amt)} received.`
+          : `${ghs(amt)} recorded. ${ghs(remaining - amt)} still due on ${o.id}.`,
       },
     )
     setPanel('none')

@@ -15,6 +15,7 @@ import {
   type DonutSlice,
 } from '../components/charts'
 import { SupplierMap } from '../components/SupplierMap'
+import { formatCount } from '../lib/format'
 import { DataTable } from '../components/dataTable'
 import type { Supplier } from '../types'
 import {
@@ -33,12 +34,21 @@ import {
   TABLE_MIN_W,
 } from './shared'
 
+/** A supplier's `source` is a link only when it is a real http(s) URL; notes
+ *  like "demo dataset" or "Agnes contact list" stay plain text (they used to
+ *  become relative links such as /demo%20dataset). */
+export function sourceUrl(source: string): string | null {
+  try {
+    const url = new URL(source)
+    return url.protocol === 'http:' || url.protocol === 'https:' ? url.href : null
+  } catch {
+    return null
+  }
+}
+
 export function SuppliersPage({ data }: { data: Dataset }) {
   const [filter, setFilter] = useState<'all' | Category>('all')
   const [query, setQuery] = useState(() => new URLSearchParams(window.location.search).get('q') ?? '')
-  // Mini-stats and the map reflect the rows on the current page, exactly as
-  // the previous table's paginated slice did.
-  const [visibleRows, setVisibleRows] = useState<Supplier[]>([])
 
   // The palette (and shared links) set ?q=; keep the box in sync with it.
   useEffect(() => {
@@ -140,16 +150,19 @@ export function SuppliersPage({ data }: { data: Dataset }) {
         return (
           <div>
             <div className="font-medium text-ink">{s.name}</div>
-            {s.source && (
-              <a
-                href={s.source}
-                target="_blank"
-                rel="noreferrer"
-                className="text-[11px] text-brand-600 hover:underline dark:text-brand-400"
-              >
-                source &#8599;
-              </a>
-            )}
+            {s.source &&
+              (sourceUrl(s.source) ? (
+                <a
+                  href={sourceUrl(s.source)!}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-[11px] text-brand-600 hover:underline"
+                >
+                  Source &#8599;
+                </a>
+              ) : (
+                <span className="text-[11px] text-ink-faint">Source: {s.source}</span>
+              ))}
           </div>
         )
       case 'category':
@@ -204,15 +217,18 @@ export function SuppliersPage({ data }: { data: Dataset }) {
     }
   }
 
+  // Stats, chart and map describe every supplier that matches the search and
+  // category filter, not just the table page on screen (paging used to drop
+  // Safety and Tools, which sort onto page 2).
   const pipelineCounts = STATUSES.map((st) => ({
     label: STATUS_LABELS[st],
-    value: visibleRows.filter((s) => s.status === st).length,
+    value: matching.filter((s) => s.status === st).length,
     color: STATUS_COLORS[st],
   }))
 
   const categoryBars = CATEGORIES.map((cat) => ({
     label: CATEGORY_SHORT[cat],
-    value: visibleRows.filter((s) => s.category === cat).length,
+    value: matching.filter((s) => s.category === cat).length,
     color: CATEGORY_COLORS[cat],
   }))
 
@@ -238,7 +254,7 @@ export function SuppliersPage({ data }: { data: Dataset }) {
               />
               {p.label}
             </div>
-            <div className="mt-1 text-2xl font-bold text-ink">{p.value}</div>
+            <div className="num mt-1 text-2xl font-semibold text-ink">{formatCount(p.value)}</div>
           </div>
         ))}
       </div>
@@ -253,8 +269,11 @@ export function SuppliersPage({ data }: { data: Dataset }) {
       </div>
 
       {/* Map */}
-      <ChartCard title="Supplier map" sub="Filtered by category">
-        <SupplierMap suppliers={visibleRows} height={340} />
+      <ChartCard
+        title="Supplier map"
+        sub={`${matching.length} supplier${matching.length === 1 ? '' : 's'}${filter === 'all' ? '' : ` · ${CATEGORY_SHORT[filter]}`}`}
+      >
+        <SupplierMap suppliers={matching} height={340} />
         <MapLegend />
       </ChartCard>
 
@@ -297,7 +316,6 @@ export function SuppliersPage({ data }: { data: Dataset }) {
         getRowId={(s) => s.id}
         renderCell={renderCell}
         noun="Suppliers"
-        onVisibleRows={setVisibleRows}
         containerClassName="max-h-[70vh] overflow-y-auto"
         tableClassName={TABLE_MIN_W}
         emptyMessage={q ? `No suppliers match “${query.trim()}”.` : 'No suppliers in this category yet.'}

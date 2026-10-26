@@ -35,6 +35,7 @@ import type { CashEntry, CashKind } from '../types'
 import { daysSince } from '../types'
 import { localDate } from '../lib/localData'
 import { computeMetrics } from '../lib/metrics'
+import { formatGhsCompact } from '../lib/format'
 import { Sparkline } from './shared'
 import {
   CASH_KIND_LABELS,
@@ -334,12 +335,12 @@ export function CashTrackerPage({
 
   // Composition donuts — the deposit-vs-balance split the Day-5 note promised.
   const inSlices: DonutSlice[] = [
-    { name: 'Deposits', value: monthEntries.filter((c) => c.kind === 'deposit_in').reduce((s, c) => s + c.ghs, 0), color: 'var(--color-stage-ordered)' },
+    { name: 'Deposits', value: monthEntries.filter((c) => c.kind === 'deposit_in').reduce((s, c) => s + c.ghs, 0), color: 'var(--color-cash-in)' },
     { name: 'Balances', value: monthEntries.filter((c) => c.kind === 'balance_in').reduce((s, c) => s + c.ghs, 0), color: 'var(--color-stage-draft)' },
   ]
   const outSlices: DonutSlice[] = [
-    { name: 'Suppliers', value: monthEntries.filter((c) => c.kind === 'supplier_out').reduce((s, c) => s + c.ghs, 0), color: '#334155' },
-    { name: 'Expenses', value: monthEntries.filter((c) => c.kind === 'expense_out').reduce((s, c) => s + c.ghs, 0), color: '#94a3b8' },
+    { name: 'Suppliers', value: monthEntries.filter((c) => c.kind === 'supplier_out').reduce((s, c) => s + c.ghs, 0), color: 'var(--color-cash-out)' },
+    { name: 'Expenses', value: monthEntries.filter((c) => c.kind === 'expense_out').reduce((s, c) => s + c.ghs, 0), color: 'var(--color-stage-quoted)' },
   ]
 
   // Balance spark across the whole ledger (Dashboard parity).
@@ -397,10 +398,10 @@ export function CashTrackerPage({
           </div>
         </ChartCard>
         <ChartCard title="Money in" sub={`${monthName} · deposit vs balance`}>
-          <DonutChart data={inSlices} centerLabel={ghs(monthIn)} />
+          <DonutChart data={inSlices} centerLabel="in" format={ghs} centerFormat={formatGhsCompact} />
         </ChartCard>
         <ChartCard title="Money out" sub={`${monthName} · supplier vs expense`}>
-          <DonutChart data={outSlices} centerLabel={ghs(monthOut)} />
+          <DonutChart data={outSlices} centerLabel="out" format={ghs} centerFormat={formatGhsCompact} />
         </ChartCard>
       </div>
 
