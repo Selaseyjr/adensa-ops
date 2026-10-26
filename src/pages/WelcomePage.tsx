@@ -1,13 +1,11 @@
 import { Link } from 'react-router-dom'
-import '@fontsource/playfair-display/400.css'
-import '@fontsource/playfair-display/700.css'
-import '@fontsource/playfair-display/400-italic.css'
+import { BRAND, SunMark } from '../components/brand'
 
 /**
  * Public "exhibition poster" hero (Glacier template, adapted to ADENSA).
  *
- * Layout follows Scrolltide's Glacier composition — centred brand lockup,
- * two-line serif headline (light over bold), italic subtitle, a true-ellipse
+ * Layout follows Scrolltide's Glacier composition: centred brand lockup,
+ * two-line headline (light over bold), subtitle, a true-ellipse
  * CTA, and a thin footer bar — on a self-contained dark canvas, so the
  * console theme never bleeds in and this page never bleeds out.
  *
@@ -16,8 +14,8 @@ import '@fontsource/playfair-display/400-italic.css'
  * prefers-reduced-motion. No framer-motion, no video.
  */
 
-const CREAM = '#F5EFE6'
-const GOLD = '#C9A227'
+const CREAM = BRAND.ivory
+const GOLD = BRAND.gold
 
 const label: React.CSSProperties = {
   fontSize: '10.5px',
@@ -29,23 +27,6 @@ const label: React.CSSProperties = {
   textDecoration: 'none',
 }
 
-/** ADENSA Stack Peak mark — three stacked slabs, gold crown on top. */
-function StackPeak({ size = 24 }: { size?: number }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="106 110 300 292"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <rect x="198" y="110" width="116" height="68" rx="8" fill={GOLD} />
-      <rect x="152" y="222" width="208" height="68" rx="8" fill={CREAM} />
-      <rect x="106" y="334" width="300" height="68" rx="8" fill={CREAM} />
-    </svg>
-  )
-}
-
 export default function WelcomePage() {
   return (
     <section
@@ -55,7 +36,7 @@ export default function WelcomePage() {
         width: '100%',
         minHeight: '100svh',
         overflow: 'hidden',
-        background: '#0B1424',
+        background: '#0A1220',
         display: 'flex',
         flexDirection: 'column',
       }}
@@ -74,7 +55,7 @@ export default function WelcomePage() {
           width: '1040px',
           height: '740px',
           background:
-            'radial-gradient(ellipse at 50% 32%, rgba(37,99,235,0.30) 0%, rgba(23,37,84,0.12) 44%, transparent 68%)',
+            'radial-gradient(ellipse at 50% 32%, rgba(47,111,219,0.22) 0%, rgba(14,27,44,0.12) 44%, transparent 68%)',
           pointerEvents: 'none',
         }}
       />
@@ -88,7 +69,7 @@ export default function WelcomePage() {
           width: '900px',
           height: '640px',
           background:
-            'radial-gradient(ellipse at 60% 60%, rgba(201,162,39,0.13) 0%, transparent 62%)',
+            'radial-gradient(ellipse at 60% 60%, rgba(212,162,30,0.14) 0%, transparent 62%)',
           pointerEvents: 'none',
         }}
       />
@@ -132,7 +113,7 @@ export default function WelcomePage() {
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '11px' }}>
-            <StackPeak />
+            <SunMark tone="night" className="h-7 w-auto" />
             <span
               style={{
                 fontSize: '15px',
@@ -168,8 +149,8 @@ export default function WelcomePage() {
           className="w-fade-up-lg"
           style={{
             margin: 0,
-            fontFamily: "'Playfair Display', Georgia, serif",
-            textTransform: 'uppercase',
+            fontFamily: "'Inter', sans-serif",
+            letterSpacing: '-0.02em',
             color: CREAM,
             textShadow: '0 2px 40px rgba(0,0,0,0.45)',
             animationDuration: '0.85s',
@@ -185,7 +166,7 @@ export default function WelcomePage() {
               letterSpacing: '0.02em',
             }}
           >
-            Your Project,
+            Your project.
           </span>
           <span
             style={{
@@ -196,7 +177,7 @@ export default function WelcomePage() {
               letterSpacing: '0.01em',
             }}
           >
-            Our Procurement
+            Our procurement.
           </span>
         </h1>
 
@@ -206,8 +187,7 @@ export default function WelcomePage() {
           style={{
             margin: '24px 0 0',
             maxWidth: '500px',
-            fontFamily: "'Playfair Display', Georgia, serif",
-            fontStyle: 'italic',
+            fontFamily: "'Inter', sans-serif",
             fontWeight: 400,
             fontSize: '18px',
             lineHeight: 1.5,
@@ -217,8 +197,8 @@ export default function WelcomePage() {
             animationDelay: '0.42s',
           }}
         >
-          Materials sourced, inspected and delivered — one accountable partner
-          from order to site.
+          Building materials sourced, checked and delivered by one accountable
+          partner, from order to site.
         </p>
 
         {/* Ellipse CTA — borderRadius 50% makes a true ellipse, per the template */}
@@ -242,7 +222,7 @@ export default function WelcomePage() {
             animationDelay: '0.58s',
           }}
         >
-          Enter the Console
+          Open AdensaOps
         </Link>
       </div>
 
@@ -271,8 +251,8 @@ export default function WelcomePage() {
           className="w-footer-center"
           style={{ ...label, position: 'absolute', left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: '5px' }}
         >
-          <span style={{ color: 'rgba(245,239,230,0.92)', fontWeight: 600 }}>Your Project,</span>
-          <span>Our Procurement</span>
+          <span style={{ color: 'rgba(245,239,230,0.92)', fontWeight: 600 }}>Your project.</span>
+          <span>Our procurement.</span>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>

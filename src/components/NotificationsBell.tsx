@@ -122,7 +122,7 @@ export function NotificationsBell({
         <Bell size={16} />
         {unread.length > 0 && (
           <span
-            className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-600 px-1 text-[9px] font-bold leading-none text-white"
+            className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-bold leading-none text-on-primary"
             aria-hidden="true"
           >
             {unread.length > 9 ? '9+' : unread.length}
@@ -141,7 +141,7 @@ export function NotificationsBell({
             <div className="flex items-center gap-2">
               <h2 className="text-sm font-semibold text-ink">Notifications</h2>
               {unread.length > 0 && (
-                <span className="rounded-full bg-brand-600 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
+                <span className="rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-bold leading-none text-on-primary">
                   {unread.length} new
                 </span>
               )}
@@ -218,7 +218,7 @@ export function NotificationsBell({
                         <div className="flex items-center gap-2">
                           {!isRead && (
                             <span
-                              className="h-1.5 w-1.5 shrink-0 rounded-full bg-brand-600"
+                              className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary"
                               aria-label="Unread"
                             />
                           )}

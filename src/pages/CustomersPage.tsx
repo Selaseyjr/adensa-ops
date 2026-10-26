@@ -163,7 +163,7 @@ export function CustomersPage({ data }: { data: Dataset }) {
                 />
                 <Tooltip
                   contentStyle={CHART_TOOLTIP_STYLE}
-                  cursor={{ fill: 'rgba(124, 58, 237, 0.10)' }}
+                  cursor={{ fill: 'var(--color-subtle)' }}
                   formatter={(value) => [`${value} customer${Number(value) === 1 ? '' : 's'}`, 'Need']}
                 />
                 <Bar dataKey="value" radius={[6, 6, 0, 0]} maxBarSize={56}>

@@ -14,7 +14,7 @@ import {
   type QuoteStatus,
 } from './types'
 import { localDate, nextCustomerId } from './lib/localData'
-import lockupDay from './assets/adensa-lockup-day.svg'
+import { AdensaLogo } from './components/brand'
 
 function ghs(n: number): string {
   return `GH¢${n.toLocaleString('en-GH')}`
@@ -288,7 +288,7 @@ function NewQuoteForm({
                   type="button"
                   aria-label={`Remove line ${i + 1}`}
                   onClick={() => setLines((ls) => (ls.length > 1 ? ls.filter((x) => x.key !== l.key) : ls))}
-                  className="mt-1 shrink-0 rounded-lg p-1.5 text-ink-faint transition hover:bg-track hover:text-rose-600"
+                  className="mt-1 shrink-0 rounded-lg p-1.5 text-ink-faint transition hover:bg-track hover:text-danger"
                 >
                   <Trash2 size={15} />
                 </button>
@@ -339,7 +339,7 @@ function NewQuoteForm({
                 </span>
                 {margin !== null && (
                   <span
-                    className={`font-medium ${margin < 0 ? 'text-rose-600' : 'text-brand-600 dark:text-brand-400'}`}
+                    className={`font-medium ${margin < 0 ? 'text-danger' : 'text-brand-600 dark:text-brand-400'}`}
                   >
                     {margin < 0 ? '' : '+'}
                     {margin}% margin
@@ -378,13 +378,13 @@ function NewQuoteForm({
         </div>
         <div>
           <div className="text-[10px] font-semibold uppercase tracking-wide text-ink-faint">Gross margin</div>
-          <div className={`mt-0.5 font-semibold ${totals.marginGhs < 0 ? 'text-rose-600' : 'text-ink'}`}>
+          <div className={`mt-0.5 font-semibold ${totals.marginGhs < 0 ? 'text-danger' : 'text-ink'}`}>
             {totals.costedLines > 0 ? ghs(totals.marginGhs) : '-'}
           </div>
         </div>
         <div>
           <div className="text-[10px] font-semibold uppercase tracking-wide text-ink-faint">Margin %</div>
-          <div className={`mt-0.5 font-semibold ${totals.marginGhs < 0 ? 'text-rose-600' : 'text-brand-600 dark:text-brand-400'}`}>
+          <div className={`mt-0.5 font-semibold ${totals.marginGhs < 0 ? 'text-danger' : 'text-brand-600 dark:text-brand-400'}`}>
             {totals.marginPct !== null ? `${totals.marginPct}%` : '-'}
           </div>
         </div>
@@ -417,7 +417,7 @@ function NewQuoteForm({
         </div>
       </div>
 
-      {error && <p className="text-xs font-medium text-rose-600 dark:text-rose-400">{error}</p>}
+      {error && <p className="text-xs font-medium text-danger">{error}</p>}
 
       <div className="flex justify-end gap-2 border-t border-line pt-4">
         <button
@@ -429,7 +429,7 @@ function NewQuoteForm({
         </button>
         <button
           type="submit"
-          className="rounded-lg bg-brand-600 px-4 py-2 text-xs font-medium text-white transition hover:bg-brand-700"
+          className="rounded-lg bg-primary px-4 py-2 text-xs font-medium text-on-primary transition hover:bg-primary-hover"
         >
           Save quote
         </button>
@@ -464,42 +464,42 @@ function QuoteSheet({
           </button>
           <button
             onClick={onPrint}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-4 py-2 text-xs font-medium text-white transition hover:bg-brand-700"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-medium text-on-primary transition hover:bg-primary-hover"
           >
             <Printer size={13} />
             Print / Save as PDF
           </button>
         </div>
-        <div className="print-sheet rounded-xl bg-white p-10 text-[#12224a] shadow-xl">
-          <div className="flex items-start justify-between border-b border-[#dde6f2] pb-6">
-            <img src={lockupDay} alt="Adensa" className="h-10 w-auto" />
+        <div className="print-sheet rounded-xl bg-white p-10 text-[#0e1b2c] shadow-xl">
+          <div className="flex items-start justify-between border-b border-[#e8e5dd] pb-6">
+            <AdensaLogo tone="day" className="h-11" />
             <div className="text-right">
               <div className="text-xl font-bold tracking-wide">QUOTATION</div>
-              <div className="mt-1 text-xs text-[#41526f]">{quote.id}</div>
-              <div className="text-xs text-[#41526f]">Issued {fmtLong(quote.sentOn)}</div>
+              <div className="mt-1 text-xs text-[#3d4a5c]">{quote.id}</div>
+              <div className="text-xs text-[#3d4a5c]">Issued {fmtLong(quote.sentOn)}</div>
               {quote.validUntil && (
-                <div className="text-xs text-[#41526f]">Valid until {fmtLong(quote.validUntil)}</div>
+                <div className="text-xs text-[#3d4a5c]">Valid until {fmtLong(quote.validUntil)}</div>
               )}
             </div>
           </div>
 
           <div className="mt-6 grid grid-cols-2 gap-6 text-sm">
             <div>
-              <div className="text-[10px] font-semibold uppercase tracking-wide text-[#7787a3]">Prepared for</div>
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-[#566072]">Prepared for</div>
               <div className="mt-1 font-semibold">{customer?.name ?? 'Customer'}</div>
-              {customer?.contactPerson && <div className="text-[#41526f]">{customer.contactPerson}</div>}
-              <div className="text-[#41526f]">{customer?.city ?? ''}</div>
-              {customer?.phone && <div className="text-[#41526f]">{customer.phone}</div>}
+              {customer?.contactPerson && <div className="text-[#3d4a5c]">{customer.contactPerson}</div>}
+              <div className="text-[#3d4a5c]">{customer?.city ?? ''}</div>
+              {customer?.phone && <div className="text-[#3d4a5c]">{customer.phone}</div>}
             </div>
-            <div className="text-right text-[#41526f]">
-              <div className="font-semibold text-[#12224a]">Adensa Supply &amp; Logistics Ltd.</div>
-              <div>Your project, Our Procurement.</div>
+            <div className="text-right text-[#3d4a5c]">
+              <div className="font-semibold text-[#0e1b2c]">Adensa Supply &amp; Logistics Ltd.</div>
+              <div>Your project. Our procurement.</div>
             </div>
           </div>
 
           <table className="mt-8 w-full border-collapse text-sm">
             <thead>
-              <tr className="border-b-2 border-[#12224a] text-left text-[10px] uppercase tracking-wide text-[#7787a3]">
+              <tr className="border-b-2 border-[#0e1b2c] text-left text-[10px] uppercase tracking-wide text-[#566072]">
                 <th className="py-2">Item</th>
                 <th className="py-2 text-right">Qty</th>
                 <th className="py-2 text-right">Unit price</th>
@@ -508,7 +508,7 @@ function QuoteSheet({
             </thead>
             <tbody>
               {quote.lines?.map((l, i) => (
-                <tr key={i} className="border-b border-[#dde6f2]">
+                <tr key={i} className="border-b border-[#e8e5dd]">
                   <td className="py-2.5 pr-3">{l.description}</td>
                   <td className="py-2.5 text-right tabular-nums">{l.qty.toLocaleString('en-GH')}</td>
                   <td className="py-2.5 text-right tabular-nums">{ghs(l.unitPriceGhs)}</td>
@@ -516,7 +516,7 @@ function QuoteSheet({
                 </tr>
               ))}
               {!quote.lines?.length && (
-                <tr className="border-b border-[#dde6f2]">
+                <tr className="border-b border-[#e8e5dd]">
                   <td className="py-2.5 pr-3">Supply and delivery as discussed</td>
                   <td className="py-2.5 text-right">1</td>
                   <td className="py-2.5 text-right tabular-nums">{ghs(quote.valueGhs)}</td>
@@ -525,7 +525,7 @@ function QuoteSheet({
               )}
             </tbody>
             <tfoot>
-              <tr className="border-t-2 border-[#12224a]">
+              <tr className="border-t-2 border-[#0e1b2c]">
                 <td colSpan={3} className="py-3 text-right text-xs font-semibold uppercase tracking-wide">
                   Total (GH¢)
                 </td>
@@ -540,8 +540,8 @@ function QuoteSheet({
             </tfoot>
           </table>
 
-          {quote.notes && <p className="mt-5 text-sm text-[#41526f]">{quote.notes}</p>}
-          <p className="mt-8 border-t border-[#dde6f2] pt-4 text-[11px] text-[#7787a3]">
+          {quote.notes && <p className="mt-5 text-sm text-[#3d4a5c]">{quote.notes}</p>}
+          <p className="mt-8 border-t border-[#e8e5dd] pt-4 text-[11px] text-[#566072]">
             Prices are stated in Ghana cedis and are valid until the date shown above. Delivery timelines
             are confirmed at the point of order. Thank you for the opportunity to serve you.
           </p>
@@ -612,7 +612,7 @@ export function QuoteBuilderPage({
         </div>
         <button
           onClick={() => setCreating(true)}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary shadow-sm transition hover:bg-primary-hover"
         >
           <Plus size={15} />
           New quote
@@ -629,7 +629,7 @@ export function QuoteBuilderPage({
               onClick={() => setFilter(f.key)}
               className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
                 active
-                  ? 'border-brand-600 bg-brand-600 text-white'
+                  ? 'border-primary bg-primary text-on-primary'
                   : 'border-line-strong text-ink-soft hover:bg-subtle'
               }`}
             >
@@ -655,7 +655,7 @@ export function QuoteBuilderPage({
           {data.quotes.length === 0 && (
             <button
               onClick={() => setCreating(true)}
-              className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-brand-700"
+              className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-on-primary transition hover:bg-primary-hover"
             >
               <Plus size={13} />
               New quote
@@ -690,7 +690,7 @@ export function QuoteBuilderPage({
                     </td>
                     <td className="px-4 py-3 text-right tabular-nums">
                       {marginPct !== null ? (
-                        <span className={marginPct < 0 ? 'text-rose-600' : 'text-brand-600 dark:text-brand-400'}>
+                        <span className={marginPct < 0 ? 'text-danger' : 'text-brand-600 dark:text-brand-400'}>
                           {marginPct < 0 ? '' : '+'}
                           {marginPct}% · {ghs(t!.marginGhs)}
                         </span>
@@ -733,7 +733,7 @@ export function QuoteBuilderPage({
                               onClick={() => onSetStatus(q.id, 'declined')}
                               aria-label={`Mark ${q.id} declined`}
                               title="Mark declined"
-                              className="rounded-lg p-1.5 text-ink-faint transition hover:bg-track hover:text-rose-600"
+                              className="rounded-lg p-1.5 text-ink-faint transition hover:bg-track hover:text-danger"
                             >
                               <X size={15} />
                             </button>

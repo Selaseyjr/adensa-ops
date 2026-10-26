@@ -281,7 +281,7 @@ export function ComparePage({ data }: { data: Dataset }) {
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] text-ink-faint">
           <span className="flex items-center gap-1.5">
-            <span className="inline-block h-2.5 w-2.5 rounded-sm bg-brand-600" /> Unit price
+            <span className="inline-block h-2.5 w-2.5 rounded-sm bg-primary" /> Unit price
           </span>
           <span className="flex items-center gap-1.5">
             <span className="inline-block h-2.5 w-2.5 rounded-sm bg-brand-300" /> Transport
@@ -292,7 +292,7 @@ export function ComparePage({ data }: { data: Dataset }) {
           </span>
           {refAvg !== undefined && (
             <span className="flex items-center gap-1.5">
-              <span className="inline-block h-0 w-5 border-t-2 border-dashed border-amber-600" />{' '}
+              <span className="inline-block h-0 w-5 border-t-2 border-dashed border-warning/40" />{' '}
               Market reference
             </span>
           )}
@@ -353,14 +353,14 @@ export function ComparePage({ data }: { data: Dataset }) {
                 <td className="px-4 py-3">
                   <div className="text-ink">{quote.capturedOn}</div>
                   {stale && (
-                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">
+                    <span className="rounded-full bg-warning-soft px-2 py-0.5 text-[11px] font-medium text-warning">
                       {daysSince(quote.capturedOn)}d old
                     </span>
                   )}
                 </td>
                 <td className="px-4 py-3">
                   {quote.inStock === false ? (
-                    <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-medium text-rose-700 dark:bg-rose-950/60 dark:text-rose-300">
+                    <span className="rounded-full bg-danger-soft px-2 py-0.5 text-[11px] font-medium text-danger">
                       no stock
                     </span>
                   ) : quote.inStock ? (
@@ -378,7 +378,7 @@ export function ComparePage({ data }: { data: Dataset }) {
       </div>
 
       {reference.length > 0 && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+        <div className="rounded-xl border border-warning/40 bg-warning-soft px-4 py-3 text-xs text-warning">
           <span className="font-semibold">Market reference:</span>{' '}
           {reference
             .map(
@@ -448,7 +448,7 @@ export function ComparePage({ data }: { data: Dataset }) {
                       <CalendarClock size={12} />
                       {p.capturedOn}
                       {stale && (
-                        <span className="rounded-full bg-amber-100 px-1.5 py-0.5 font-medium text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">
+                        <span className="rounded-full bg-warning-soft px-1.5 py-0.5 font-medium text-warning">
                           {daysSince(p.capturedOn)}d old
                         </span>
                       )}

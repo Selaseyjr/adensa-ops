@@ -150,7 +150,7 @@ function RecordPaymentForm({
               aria-pressed={kind === value}
               className={`min-h-11 flex-1 rounded-lg border px-3 text-xs font-medium transition ${
                 kind === value
-                  ? 'border-brand-600 bg-brand-600 text-white'
+                  ? 'border-primary bg-primary text-on-primary'
                   : 'border-line-strong bg-surface text-ink-soft hover:border-brand-400'
               }`}
             >
@@ -224,7 +224,7 @@ function RecordPaymentForm({
           ))}
         </select>
       </div>
-      {error && <p className="text-xs text-rose-600 dark:text-rose-400">{error}</p>}
+      {error && <p className="text-xs text-danger">{error}</p>}
       <div className="flex justify-end gap-2">
         <button
           type="button"
@@ -235,7 +235,7 @@ function RecordPaymentForm({
         </button>
         <button
           type="submit"
-          className="rounded-lg bg-brand-600 px-4 py-2 text-xs font-medium text-white transition hover:bg-brand-700"
+          className="rounded-lg bg-primary px-4 py-2 text-xs font-medium text-on-primary transition hover:bg-primary-hover"
         >
           Record payment
         </button>
@@ -488,7 +488,7 @@ export function CashTrackerPage({
             <button
               type="button"
               onClick={() => setRecordOpen(true)}
-              className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg bg-brand-600 px-4 py-2 text-xs font-medium text-white transition hover:bg-brand-700"
+              className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-medium text-on-primary transition hover:bg-primary-hover"
             >
               <Plus size={14} aria-hidden="true" /> Record payment
             </button>
@@ -510,7 +510,7 @@ export function CashTrackerPage({
                 <button
                   type="button"
                   onClick={() => setRecordOpen(true)}
-                  className="rounded-lg bg-brand-600 px-4 py-2 text-xs font-medium text-white transition hover:bg-brand-700"
+                  className="rounded-lg bg-primary px-4 py-2 text-xs font-medium text-on-primary transition hover:bg-primary-hover"
                 >
                   Record the first payment
                 </button>

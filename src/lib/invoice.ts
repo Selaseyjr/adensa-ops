@@ -11,12 +11,13 @@ import type { jsPDF } from 'jspdf'
 import type { CashEntry, CashKind, Customer, Order } from '../types'
 
 /* ── print-safe palette (mirrors the quote sheet) ─────────────────────── */
-const INK: [number, number, number] = [18, 34, 74] // #12224a navy
-const SOFT: [number, number, number] = [65, 82, 111] // #41526f
-const FAINT: [number, number, number] = [119, 135, 163] // #7787a3
-const HAIRLINE: [number, number, number] = [221, 230, 242] // #dde6f2
-const SUBTLE: [number, number, number] = [242, 246, 252] // #f2f6fc
-const GOLD_INK: [number, number, number] = [156, 125, 18] // #9c7d12 — gold that survives print
+const INK: [number, number, number] = [14, 27, 44] // #0e1b2c navy
+const SOFT: [number, number, number] = [61, 74, 92] // #3d4a5c
+const FAINT: [number, number, number] = [86, 96, 114] // #566072
+const HAIRLINE: [number, number, number] = [232, 229, 221] // #e8e5dd
+const SUBTLE: [number, number, number] = [246, 245, 241] // #f6f5f1
+const GOLD_INK: [number, number, number] = [138, 106, 18] // #8a6a12, gold text that survives print
+const GOLD: [number, number, number] = [212, 162, 30] // #d4a21e, the mark's sun
 const PAID: [number, number, number] = [15, 110, 70] // green
 const DUE: [number, number, number] = [180, 83, 9] // amber
 
@@ -158,20 +159,44 @@ export function receiptFilename(m: ReceiptModel): string {
 
 const M = { left: 18, right: 192 } // A4 in mm, 18mm side margins
 
-/** Stepped ADENSA mark + wordmark left, document title right, two-tone rule. */
-function drawHeader(doc: jsPDF, title: string, sub1: string, sub2?: string): void {
-  const markCx = 25
-  const bars: Array<[number, [number, number, number]]> = [
-    [6, [201, 162, 39]],
-    [10.4, INK],
-    [14.8, INK],
-  ]
-  let by = 15
-  for (const [w, rgb] of bars) {
-    doc.setFillColor(rgb[0], rgb[1], rgb[2])
-    doc.roundedRect(markCx - w / 2, by, w, 3, 0.8, 0.8, 'F')
-    by += 3.8
+/** First Light mark (scaled from src/components/brand.tsx geometry, mm). */
+function drawMark(doc: jsPDF, x: number, y: number, size: number): void {
+  // Artwork box on the 640 artboard: x 140..500, y 160..490.
+  const k = size / 330
+  const px = (v: number) => x + (v - 140) * k
+  const py = (v: number) => y + (v - 160) * k
+  const cx = 320
+  const cy = 278
+  const r = 56
+  doc.setFillColor(GOLD[0], GOLD[1], GOLD[2])
+  // Half-sun as a polygon fan (jsPDF has no arc primitive).
+  const pts: [number, number][] = []
+  for (let i = 0; i <= 24; i++) {
+    const a = Math.PI - (i / 24) * Math.PI
+    pts.push([px(cx + Math.cos(a) * r), py(cy - Math.sin(a) * r)])
   }
+  const deltas = pts.slice(1).map((p, i) => [p[0] - pts[i][0], p[1] - pts[i][1]])
+  doc.lines(deltas, pts[0][0], pts[0][1], [1, 1], 'F', true)
+  doc.setDrawColor(GOLD[0], GOLD[1], GOLD[2])
+  doc.setLineWidth(13 * k)
+  doc.setLineCap('round')
+  for (const deg of [30, 60, 90, 120, 150]) {
+    const a = (deg * Math.PI) / 180
+    doc.line(px(cx + Math.cos(a) * 72), py(cy - Math.sin(a) * 72), px(cx + Math.cos(a) * 100), py(cy - Math.sin(a) * 100))
+  }
+  doc.setLineCap('butt')
+  doc.setFillColor(INK[0], INK[1], INK[2])
+  for (const b of [
+    { x: 204, y: 305, w: 232, h: 72 },
+    { x: 152, y: 403, w: 336, h: 72 },
+  ]) {
+    doc.roundedRect(px(b.x), py(b.y), b.w * k, b.h * k, 12 * k, 12 * k, 'F')
+  }
+}
+
+/** First Light mark + wordmark left, document title right, two-tone rule. */
+function drawHeader(doc: jsPDF, title: string, sub1: string, sub2?: string): void {
+  drawMark(doc, M.left, 13, 16)
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(20)
   doc.setTextColor(INK[0], INK[1], INK[2])
@@ -203,7 +228,7 @@ function drawHeader(doc: jsPDF, title: string, sub1: string, sub2?: string): voi
   doc.setDrawColor(INK[0], INK[1], INK[2])
   doc.setLineWidth(0.7)
   doc.line(M.left, 35, M.right, 35)
-  doc.setDrawColor(201, 162, 39)
+  doc.setDrawColor(GOLD[0], GOLD[1], GOLD[2])
   doc.line(M.left, 36.4, 48, 36.4)
 }
 

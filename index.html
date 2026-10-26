@@ -3,13 +3,13 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- Adensa Stack Peak mark: vector where supported, PNG/ICO elsewhere. -->
+    <!-- First Light mark: vector where supported, PNG/ICO elsewhere. -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-    <link rel="mask-icon" href="/favicon.svg" color="#171717" />
-    <meta name="theme-color" content="#FAFAF9" />
+    <link rel="mask-icon" href="/favicon.svg" color="#0E1B2C" />
+    <meta name="theme-color" content="#F6F5F1" />
     <title>AdensaOps | Procurement Console</title>
     <script>
       // Apply the saved theme before first paint so dark mode never flashes.
@@ -21,7 +21,7 @@
           // Phone and tablet browsers tint the browser chrome with theme-color:
           // keep it on the active canvas so the chrome matches the page.
           var meta = document.querySelector('meta[name="theme-color"]');
-          if (meta) meta.setAttribute('content', dark ? '#111111' : '#FAFAF9');
+          if (meta) meta.setAttribute('content', dark ? '#0A1220' : '#F6F5F1');
         } catch (e) {
           /* storage unavailable — stay on light */
         }
@@ -41,7 +41,7 @@
         justify-content: center;
         gap: 28px;
         overflow: hidden;
-        background: #111111;
+        background: #0a1220;
         transition: opacity 600ms ease;
       }
       #adensa-splash.splash-hide {
@@ -61,11 +61,11 @@
         opacity: 0.5;
       }
       #adensa-splash::before {
-        background: radial-gradient(circle at 30% 35%, rgba(249, 115, 22, 0.24) 0%, transparent 45%);
+        background: radial-gradient(circle at 30% 35%, rgba(47, 111, 219, 0.2) 0%, transparent 45%);
         animation: splash-drift-a 16s ease-in-out infinite alternate;
       }
       #adensa-splash::after {
-        background: radial-gradient(circle at 70% 65%, rgba(201, 162, 39, 0.16) 0%, transparent 42%);
+        background: radial-gradient(circle at 70% 65%, rgba(212, 162, 30, 0.16) 0%, transparent 42%);
         animation: splash-drift-b 20s ease-in-out infinite alternate;
       }
       /* Giant slow-panning wordmark watermark. */
@@ -80,7 +80,7 @@
         font-size: 24vmin;
         letter-spacing: 0.35em;
         text-indent: 0.35em;
-        color: rgba(245, 239, 230, 0.04);
+        color: rgba(246, 242, 234, 0.035);
         user-select: none;
         pointer-events: none;
         animation: splash-pan 26s ease-in-out infinite alternate;
@@ -98,30 +98,26 @@
         filter: drop-shadow(0 8px 32px rgba(0, 0, 0, 0.45));
       }
       #adensa-splash .splash-tagline {
-        font-family: Poppins, 'Segoe UI', Arial, sans-serif;
-        font-weight: 700;
-        font-size: clamp(20px, 4.6vw, 30px);
-        letter-spacing: 0.04em;
+        font-family: Inter, 'Segoe UI', Arial, sans-serif;
+        font-weight: 600;
+        font-size: clamp(18px, 4.2vw, 26px);
+        letter-spacing: -0.01em;
         text-align: center;
-        color: #f5efe6;
-        text-shadow: 0 2px 18px rgba(201, 162, 39, 0.35);
-      }
-      #adensa-splash .splash-tagline .gold {
-        color: #c9a227;
+        color: #f6f2ea;
       }
       /* Indeterminate loading bar. */
       #adensa-splash .splash-track {
         width: min(240px, 56vw);
         height: 4px;
         border-radius: 999px;
-        background: rgba(245, 239, 230, 0.14);
+        background: rgba(246, 242, 234, 0.14);
         overflow: hidden;
       }
       #adensa-splash .splash-fill {
         width: 40%;
         height: 100%;
         border-radius: 999px;
-        background: linear-gradient(90deg, #f97316, #c9a227);
+        background: #d4a21e;
         animation: splash-load 1.4s ease-in-out infinite;
       }
       @keyframes splash-load {
@@ -155,16 +151,21 @@
     <div id="adensa-splash" role="status" aria-label="Loading AdensaOps">
       <div class="splash-watermark" aria-hidden="true">ADENSA</div>
       <div class="splash-core">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 410 150" role="img" aria-label="Adensa Supply and Logistics">
-          <g transform="translate(-25.125,-5) scale(0.3125)">
-            <rect fill="#C9A227" x="198" y="110" width="116" height="68" rx="8" />
-            <rect fill="#F5EFE6" x="152" y="222" width="208" height="68" rx="8" />
-            <rect fill="#F5EFE6" x="106" y="334" width="300" height="68" rx="8" />
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 150" role="img" aria-label="Adensa Supply and Logistics">
+          <g transform="translate(10 10) scale(0.394) translate(-140 -160)">
+  <path d="M 264 278 A 56 56 0 0 1 376 278 Z" fill="#D4A21E"/>
+  <line x1="382.35" y1="242" x2="406.6" y2="228" stroke="#D4A21E" stroke-width="13" stroke-linecap="round"/>
+  <line x1="356" y1="215.65" x2="370" y2="191.4" stroke="#D4A21E" stroke-width="13" stroke-linecap="round"/>
+  <line x1="320" y1="206" x2="320" y2="178" stroke="#D4A21E" stroke-width="13" stroke-linecap="round"/>
+  <line x1="284" y1="215.65" x2="270" y2="191.4" stroke="#D4A21E" stroke-width="13" stroke-linecap="round"/>
+  <line x1="257.65" y1="242" x2="233.4" y2="228" stroke="#D4A21E" stroke-width="13" stroke-linecap="round"/>
+  <rect x="204" y="305" width="232" height="72" rx="12" fill="#F6F2EA"/>
+  <rect x="152" y="403" width="336" height="72" rx="12" fill="#F6F2EA"/>
           </g>
-          <text x="128" y="78" font-family="Poppins, 'Segoe UI', Arial, sans-serif" font-weight="700" font-size="54" letter-spacing="4.5" fill="#F5EFE6">ADENSA</text>
-          <text x="129" y="110" font-family="Poppins, 'Segoe UI', Arial, sans-serif" font-weight="600" font-size="14" letter-spacing="5.6" fill="#C9A227">SUPPLY &amp; LOGISTICS</text>
+          <text x="170" y="80" font-family="Poppins, 'Segoe UI', Arial, sans-serif" font-weight="700" font-size="54" letter-spacing="7" fill="#F6F2EA">ADENSA</text>
+          <text x="172" y="108" font-family="Poppins, 'Segoe UI', Arial, sans-serif" font-weight="600" font-size="14" letter-spacing="5.6" fill="#D4A21E">SUPPLY &amp; LOGISTICS</text>
         </svg>
-        <div class="splash-tagline">The Night Never Falls<span class="gold">.</span></div>
+        <div class="splash-tagline">Your project. Our procurement.</div>
         <div class="splash-track" aria-hidden="true"><div class="splash-fill"></div></div>
       </div>
     </div>
