@@ -22,6 +22,7 @@ import { priceKey } from '../types'
 import type { Dataset } from './dataSource'
 import { mergeDataset, nextCashId, nextOrderId, type LocalRecords, type OrderOverride } from './localData'
 import type { AppNotification } from './notifications'
+import { requiredDeposit, requiredDepositRate } from './rules'
 
 /** A live notification: same as AppNotification but timestamped so it ages. */
 export interface SimNotification extends Omit<AppNotification, 'minutesAgo'> {
@@ -130,9 +131,9 @@ function weightPick(rng: () => number): SimEvent['type'] {
   return 'cashOut'
 }
 
-/** Cash received against an order so far (deposit entries + balance entries). */
-function cashReceived(orderId: string, allCash: CashEntry[]): number {
-  return allCash.filter((c) => c.orderId === orderId).reduce((s, c) => s + c.ghs, 0)
+/** Cash received against an order: recorded deposit plus balance entries. */
+function cashReceived(order: Order, allCash: CashEntry[]): number {
+  return order.depositGhs + allCash.filter((c) => c.orderId === order.id && c.kind === 'balance_in').reduce((s, c) => s + c.ghs, 0)
 }
 
 /**
@@ -275,7 +276,11 @@ export function pickSimEvent(data: Dataset, rng: () => number = Math.random): Si
     if (candidates.length === 0) return buildOrder()
     const order = pick(candidates, rng)
     const customer = customers.find((c) => c.id === order.customerId)
-    const amount = roundTo(order.valueGhs * (0.4 + rng() * 0.2), 10)
+    // Business rule: 70% confirms an order (50% for established clients).
+    const amount = Math.min(
+      order.valueGhs,
+      requiredDeposit(order.valueGhs, requiredDepositRate(order.customerId, data.orders, data.cash, order.id)),
+    )
     const entry: CashEntry = {
       id: nextCashId(data.cash, 'demo'),
       date: today,
@@ -299,21 +304,19 @@ export function pickSimEvent(data: Dataset, rng: () => number = Math.random): Si
   }
 
   const buildBalance = (): SimEvent | null => {
-    // Money can arrive at any stage after deposit, but an order is only
-    // settled once it has been delivered (partial payments never skip the
-    // delivery step).
+    // Business rule: the balance is due before offloading, so it is
+    // collected in full while the order is still with the supplier. A
+    // delivered order that still owes money (a rule break) is cleared and
+    // settled.
     const candidates = data.orders.filter(
-      (o) => o.stage !== 'quoted' && o.stage !== 'settled' && o.stage !== 'draft' && cashReceived(o.id, data.cash) < o.valueGhs,
+      (o) => (o.stage === 'ordered' || o.stage === 'delivered') && cashReceived(o, data.cash) < o.valueGhs,
     )
     if (candidates.length === 0) return buildDeposit()
     const order = pick(candidates, rng)
     const customer = customers.find((c) => c.id === order.customerId)
-    const outstanding = Math.max(0, order.valueGhs - cashReceived(order.id, data.cash))
+    const outstanding = Math.max(0, order.valueGhs - cashReceived(order, data.cash))
     const willSettle = order.stage === 'delivered'
-    // Delivered: collect the remainder and settle. Earlier: partial payment
-    // of 30-70% of what is outstanding, leaving delivery/settlement to flow.
-    const frac = willSettle ? 1 : 0.3 + rng() * 0.4
-    const amount = Math.max(10, Math.min(outstanding, roundTo(outstanding * frac, 10)))
+    const amount = outstanding
     const entry: CashEntry = {
       id: nextCashId(data.cash, 'demo'),
       date: today,
@@ -343,7 +346,19 @@ export function pickSimEvent(data: Dataset, rng: () => number = Math.random): Si
   }
 
   const buildStage = (): SimEvent | null => {
-    const delivering = data.orders.filter((o) => o.stage === 'ordered')
+    // Delivered and paid in full: close the order.
+    const settling = data.orders.filter((o) => o.stage === 'delivered' && cashReceived(o, data.cash) >= o.valueGhs)
+    if (settling.length > 0) {
+      const order = pick(settling, rng)
+      return {
+        type: 'stage',
+        orderId: order.id,
+        patch: { stage: 'settled' },
+        notification: notif('order', 'Order settled', `${order.id} delivered and paid in full.`, 'orders'),
+      }
+    }
+    // Only paid-up orders are offloaded (balance before offloading).
+    const delivering = data.orders.filter((o) => o.stage === 'ordered' && cashReceived(o, data.cash) >= o.valueGhs)
     if (delivering.length > 0) {
       const order = pick(delivering, rng)
       const customer = customers.find((c) => c.id === order.customerId)

@@ -78,9 +78,27 @@
 - Chart series colours are validated (CVD-safe in both themes): order stages
   use one ordinal navy ramp; categories use the categorical tokens.
 
+## Business rules (enforced in `src/lib/rules.ts`)
+
+- A 70% deposit confirms an order; the balance is due before offloading.
+- Established clients (3+ fully paid orders) may confirm with 50%.
+- Supplier prices older than 14 days are stale; re-check before quoting.
+- Payments only into the company MoMo merchant or bank account.
+- Rule-break flags: "Delivered with balance owing", "Deposit below 70%",
+  "Late", "Quote expiring", "Stale price". Show them wherever orders are
+  listed; never hide a flag to make a screen look clean.
+- Money model: `depositGhs` is the confirming deposit (matches its
+  `deposit_in` cash entries). Every later payment is a `balance_in` cash
+  entry only. Never add balance payments to `depositGhs`.
+
 ## Data mode
 
 - Demo mode shows simulated data, including the simulated notification feed.
+- Demo seed dates are offsets from today (`day(n)` in `src/data/demo.ts`), so
+  the demo never goes stale. Never hard-code calendar dates in demo data.
+- Demo data follows the business rules; the only breaks are one deliberate
+  example per flag (guarded by `src/data/demo.test.ts`). The simulation
+  follows the rules too.
 - Real mode NEVER shows simulated data anywhere, including notifications.
 - Real mode is PIN-gated (client-side speed bump). The PIN is not stored in
   this repository - ask the operator. Never write a PIN or seed into source.

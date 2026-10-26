@@ -10,6 +10,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import type { NotificationTarget } from '../lib/notifications'
+import type { RuleFlag } from '../lib/rules'
 import { CATEGORY_COLORS, CATEGORY_SHORT, STATUS_COLORS } from '../lib/colors'
 import { useFocusTrap } from '../lib/a11y'
 import {
@@ -174,6 +175,38 @@ export function StatCard({
     >
       {body}
     </button>
+  )
+}
+
+/* -------------------------------- Rule flags --------------------------------- */
+
+/** Compact chips for business-rule breaks; the detail is in the tooltip. */
+export function RuleFlagChips({ flags, max = 2 }: { flags: RuleFlag[]; max?: number }) {
+  if (flags.length === 0) return null
+  const shown = flags.slice(0, max)
+  const extra = flags.length - shown.length
+  return (
+    <span className="flex flex-wrap items-center gap-1">
+      {shown.map((f) => (
+        <span
+          key={f.key}
+          title={f.detail}
+          className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-medium ${
+            f.tone === 'danger' ? 'bg-danger-soft text-danger' : 'bg-warning-soft text-warning'
+          }`}
+        >
+          {f.label}
+        </span>
+      ))}
+      {extra > 0 && (
+        <span
+          title={flags.slice(max).map((f) => f.label).join(', ')}
+          className="rounded-full bg-subtle px-1.5 py-0.5 text-[10px] font-medium text-ink-faint"
+        >
+          +{extra}
+        </span>
+      )}
+    </span>
   )
 }
 

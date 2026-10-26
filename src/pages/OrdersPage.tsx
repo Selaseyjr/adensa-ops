@@ -52,7 +52,8 @@ import {
 } from '../types'
 import type { OrderOverride } from '../lib/localData'
 import { localDate } from '../lib/localData'
-import { ghs, IN_MOTION_STAGES, KpiDetailModal, STAGE_COLORS, StatCard } from './shared'
+import { balanceDue, cashReceived, orderFlags, type RuleContext } from '../lib/rules'
+import { ghs, IN_MOTION_STAGES, KpiDetailModal, RuleFlagChips, STAGE_COLORS, StatCard } from './shared'
 
 const MIN_W = 'min-w-[880px]'
 
@@ -63,9 +64,9 @@ const labelCls = 'block text-[11px] font-medium text-ink-soft'
 /** One action the operator can take for the order's current stage. */
 type Panel = 'none' | 'deposit' | 'payment' | 'delivery' | 'settle' | 'edit'
 
-function balanceOf(o: Order): number {
-  return Math.max(0, o.valueGhs - o.depositGhs)
-}
+// Deposit plus recorded balance payments: what the customer has actually paid.
+const paidOf = (o: Order, cash: CashEntry[]): number => cashReceived(o, cash)
+const balanceOf = (o: Order, cash: CashEntry[]): number => balanceDue(o, cash)
 
 /** Late = promised date passed while we still owe the customer goods. */
 function isLate(o: Order, today: string): boolean {
@@ -99,9 +100,9 @@ interface EditLine {
 }
 
 /** Received-vs-contract bar — the cash position of one order at a glance. */
-function DepositBar({ order }: { order: Order }) {
-  const pct =
-    order.valueGhs > 0 ? Math.min(100, Math.round((order.depositGhs / order.valueGhs) * 100)) : 0
+function DepositBar({ order, cash }: { order: Order; cash: CashEntry[] }) {
+  const paid = paidOf(order, cash)
+  const pct = order.valueGhs > 0 ? Math.min(100, Math.round((paid / order.valueGhs) * 100)) : 0
   return (
     <div className="min-w-[130px]">
       <div className="h-1.5 w-full overflow-hidden rounded-full bg-track">
@@ -111,7 +112,7 @@ function DepositBar({ order }: { order: Order }) {
         />
       </div>
       <div className="mt-1 text-[11px] text-ink-faint">
-        {ghs(order.depositGhs)} of {ghs(order.valueGhs)} · {pct}%
+        {ghs(paid)} of {ghs(order.valueGhs)} · {pct}%
       </div>
     </div>
   )
@@ -168,7 +169,8 @@ export function OrdersPage({
   ) => void
 }) {
   const today = localDate()
-  const [stageFilter, setStageFilter] = useState<OrderStage | 'all'>('all')
+  const ruleCtx: RuleContext = { orders: data.orders, cash: data.cash, quotes: data.quotes, prices: data.prices }
+  const [stageFilter, setStageFilter] = useState<OrderStage | 'all' | 'flagged'>('all')
   const [query, setQuery] = useState(() => new URLSearchParams(window.location.search).get('q') ?? '')
   const { sort, toggle } = useSort<'id' | 'customer' | 'value' | 'deposit' | 'stage' | 'expected' | 'age'>()
   const [page, setPage] = useState(0)
@@ -247,7 +249,13 @@ export function OrdersPage({
   }, [matched])
 
   const rows = useMemo(() => {
-    const list = stageFilter === 'all' ? matched : matched.filter((o) => o.stage === stageFilter)
+    const ctx: RuleContext = { orders: data.orders, cash: data.cash, quotes: data.quotes, prices: data.prices }
+    const list =
+      stageFilter === 'all'
+        ? matched
+        : stageFilter === 'flagged'
+          ? matched.filter((o) => orderFlags(o, ctx, today).length > 0)
+          : matched.filter((o) => o.stage === stageFilter)
     return sortRows(list, sort as SortState | null, (o) =>
       sort?.key === 'id'
         ? o.id
@@ -256,14 +264,14 @@ export function OrdersPage({
           : sort?.key === 'value'
             ? o.valueGhs
             : sort?.key === 'deposit'
-              ? o.depositGhs
+              ? paidOf(o, data.cash)
               : sort?.key === 'stage'
                 ? ORDER_STAGES.indexOf(o.stage)
                 : sort?.key === 'expected'
                   ? o.expectedDelivery
                   : daysSince(o.receivedOn),
     )
-  }, [matched, stageFilter, sort, data.customers])
+  }, [matched, stageFilter, sort, data.customers, data.orders, data.cash, data.quotes, data.prices, today])
 
   const pageRows = paginate(rows, page)
 
@@ -384,7 +392,7 @@ export function OrdersPage({
 
   /** quoted → deposit, or a top-up while still funding procurement. */
   function submitDeposit(o: Order, advance: boolean) {
-    const amt = parseAmount(amount, balanceOf(o))
+    const amt = parseAmount(amount, balanceOf(o, data.cash))
     if (amt === null) return
     onOrderAction(
       o.id,
@@ -408,15 +416,17 @@ export function OrdersPage({
 
   /** delivered → settled, or a part-payment while the balance is outstanding. */
   function submitBalance(o: Order) {
-    const remaining = balanceOf(o)
+    const remaining = balanceOf(o, data.cash)
     const amt = parseAmount(amount, remaining)
     if (amt === null) return
     const full = amt >= remaining - 0.001
+    // depositGhs stays the confirmed deposit; later payments live only as
+    // balance_in cash entries, so nothing is counted twice.
     onOrderAction(
       o.id,
-      full
-        ? { stage: 'settled', depositGhs: o.valueGhs, completedOn: o.completedOn ?? localDate() }
-        : { depositGhs: o.depositGhs + amt },
+      full && o.stage === 'delivered'
+        ? { stage: 'settled', completedOn: o.completedOn ?? localDate() }
+        : {},
       {
         cash: [
           {
@@ -428,8 +438,8 @@ export function OrdersPage({
           },
         ],
         message: full
-          ? `${o.id} settled in full — balance of GH¢${amt.toLocaleString('en-GH')} received.`
-          : `GH¢${amt.toLocaleString('en-GH')} recorded — ${ghs(remaining - amt)} still due on ${o.id}.`,
+          ? `${o.id} paid in full. Balance of GH¢${amt.toLocaleString('en-GH')} received.`
+          : `GH¢${amt.toLocaleString('en-GH')} recorded. ${ghs(remaining - amt)} still due on ${o.id}.`,
       },
     )
     setPanel('none')
@@ -439,7 +449,7 @@ export function OrdersPage({
   /** ordered → delivered: receipt & discrepancy capture (playbook Step 5). */
   function submitDelivery(o: Order) {
     if (condition !== 'complete' && delNote.trim().length === 0) {
-      setDelError('Describe what was short or damaged — the discrepancy must not vanish.')
+      setDelError('Describe what was short or damaged.')
       return
     }
     if (!delDate) {
@@ -454,19 +464,21 @@ export function OrdersPage({
         completedOn: delDate,
         receipt: { on: delDate, condition, ...(delNote.trim() ? { note: delNote.trim() } : {}) },
       },
-      { message: `${o.id} delivered — receipt captured${condition !== 'complete' ? ' with discrepancy' : ''}.` },
+      { message: `${o.id} delivered. Receipt captured${condition !== 'complete' ? ' with discrepancy' : ''}.` },
     )
     setPanel('none')
   }
 
   const open = openOrder
-  const balance = open ? balanceOf(open) : 0
+  const balance = open ? balanceOf(open, data.cash) : 0
   const lateCount = data.orders.filter((o) => isLate(o, today)).length
+  const openFlags = open ? orderFlags(open, ruleCtx, today) : []
+  const flaggedCount = matched.filter((o) => orderFlags(o, ruleCtx, today).length > 0).length
   const inMotion = data.orders.filter((o) => IN_MOTION_STAGES.includes(o.stage))
   const awaitingDeposit = data.orders.filter((o) => o.stage === 'quoted')
   const balanceDue = data.orders
     .filter((o) => o.stage === 'deposit' || o.stage === 'ordered' || o.stage === 'delivered')
-    .reduce((sum, o) => sum + balanceOf(o), 0)
+    .reduce((sum, o) => sum + balanceOf(o, data.cash), 0)
 
   return (
     <div className="space-y-5">
@@ -518,6 +530,22 @@ export function OrdersPage({
           <div className="text-[11px] font-medium uppercase tracking-wide opacity-80">All stages</div>
           <div className="num text-lg font-bold">{matched.length}</div>
         </button>
+        <button
+          type="button"
+          onClick={() => setStageFilter(stageFilter === 'flagged' ? 'all' : 'flagged')}
+          aria-pressed={stageFilter === 'flagged'}
+          className={`min-h-11 min-w-[110px] shrink-0 rounded-xl border px-3 py-2 text-left transition ${
+            stageFilter === 'flagged'
+              ? 'border-danger bg-danger text-white shadow-sm'
+              : 'border-line bg-surface text-ink-soft hover:border-danger/40'
+          }`}
+        >
+          <div className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide opacity-80">
+            <AlertTriangle size={11} aria-hidden="true" />
+            Rule breaks
+          </div>
+          <div className="num text-lg font-bold">{flaggedCount}</div>
+        </button>
         {ORDER_STAGES.map((st) => {
           const cell = railCounts.get(st)!
           const active = stageFilter === st
@@ -565,7 +593,9 @@ export function OrdersPage({
           </div>
           <p className="shrink-0 text-xs text-ink-faint">
             {rows.length} {rows.length === 1 ? 'order' : 'orders'}
-            {stageFilter !== 'all' && ` in ${ORDER_STAGE_LABELS[stageFilter]}`}
+            {stageFilter === 'flagged'
+              ? ' with rule breaks'
+              : stageFilter !== 'all' && ` in ${ORDER_STAGE_LABELS[stageFilter]}`}
           </p>
         </div>
 
@@ -574,7 +604,7 @@ export function OrdersPage({
             <EmptyState
               icon={Send}
               title="No orders yet"
-              hint="Orders open automatically when you accept a quote — or draft one now and start the pipeline."
+              hint="Accepted quotes open orders here."
               action={
                 <button
                   type="button"
@@ -614,6 +644,7 @@ export function OrdersPage({
                   <SortableTh label="Cash received" sortKey="deposit" sort={sort} onToggle={toggle} />
                   <SortableTh label="Stage" sortKey="stage" sort={sort} onToggle={toggle} />
                   <SortableTh label="Promised" sortKey="expected" sort={sort} onToggle={toggle} />
+                  <th className="px-4 py-3 text-left font-medium">Flags</th>
                   <SortableTh label="Age" sortKey="age" sort={sort} onToggle={toggle} align="right" />
                   <th className="px-4 py-3" />
                 </tr>
@@ -621,7 +652,7 @@ export function OrdersPage({
               <tbody>
                 {pageRows.map((o) => {
                   const age = daysSince(o.receivedOn)
-                  const late = isLate(o, today)
+                  const flags = orderFlags(o, ruleCtx, today)
                   return (
                     <tr
                       key={o.id}
@@ -629,7 +660,7 @@ export function OrdersPage({
                       onClick={() => show(o)}
                     >
                       <td className="px-4 py-3">
-                        <span className="num font-medium text-ink">{o.id}</span>
+                        <span className="num whitespace-nowrap font-medium text-ink">{o.id}</span>
                         {o.receipt && o.receipt.condition !== 'complete' && (
                           <span className="ml-2 inline-block rounded-full bg-warning-soft px-1.5 py-0.5 text-[10px] font-medium text-warning">
                             discrepancy
@@ -641,24 +672,20 @@ export function OrdersPage({
                       </td>
                       <td className="num px-4 py-3 text-right font-medium text-ink">{ghs(o.valueGhs)}</td>
                       <td className="px-4 py-3">
-                        <DepositBar order={o} />
+                        <DepositBar order={o} cash={data.cash} />
                       </td>
                       <td className="px-4 py-3">
                         <StageChip stage={o.stage} />
                       </td>
                       <td className="px-4 py-3">
                         {o.expectedDelivery ? (
-                          <span className="flex items-center gap-1.5 text-ink-soft">
-                            {o.expectedDelivery}
-                            {late && (
-                              <span className="rounded-full bg-danger-soft px-1.5 py-0.5 text-[10px] font-medium text-danger">
-                                late
-                              </span>
-                            )}
-                          </span>
+                          <span className="whitespace-nowrap text-ink-soft">{o.expectedDelivery}</span>
                         ) : (
-                          <span className="text-ink-faint">—</span>
+                          <span className="text-ink-faint">N/A</span>
                         )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <RuleFlagChips flags={flags} />
                       </td>
                       <td className="num px-4 py-3 text-right text-ink-soft">{age}d</td>
                       <td className="px-4 py-3 text-right">
@@ -720,6 +747,24 @@ export function OrdersPage({
           <div className="space-y-5">
             <StageStepper current={open.stage} />
 
+            {openFlags.length > 0 && (
+              <ul className="space-y-1.5" aria-label="Rule checks">
+                {openFlags.map((f) => (
+                  <li
+                    key={f.key}
+                    className={`flex items-start gap-2 rounded-lg p-2.5 text-xs ${
+                      f.tone === 'danger' ? 'bg-danger-soft text-danger' : 'bg-warning-soft text-warning'
+                    }`}
+                  >
+                    <AlertTriangle size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
+                    <span>
+                      <span className="font-semibold">{f.label}.</span> {f.detail}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+
             {/* Money */}
             <div className="grid grid-cols-3 gap-3">
               <div className="rounded-lg border border-line bg-subtle p-3">
@@ -728,7 +773,7 @@ export function OrdersPage({
               </div>
               <div className="rounded-lg border border-line bg-subtle p-3">
                 <div className="text-[10px] uppercase tracking-wide text-ink-faint">Received</div>
-                <div className="num mt-0.5 text-base font-bold text-ink">{ghs(open.depositGhs)}</div>
+                <div className="num mt-0.5 text-base font-bold text-ink">{ghs(paidOf(open, data.cash))}</div>
               </div>
               <div
                 className={`rounded-lg border p-3 ${
@@ -777,17 +822,12 @@ export function OrdersPage({
               <div>
                 <div className="text-[10px] uppercase tracking-wide text-ink-faint">Promised</div>
                 <div className="mt-0.5 text-ink">
-                  {open.expectedDelivery ?? '—'}
-                  {isLate(open, today) && (
-                    <span className="ml-1.5 rounded-full bg-danger-soft px-1.5 py-0.5 text-[10px] font-medium text-danger">
-                      late
-                    </span>
-                  )}
+                  {open.expectedDelivery ?? 'N/A'}
                 </div>
               </div>
               <div>
                 <div className="text-[10px] uppercase tracking-wide text-ink-faint">Delivered</div>
-                <div className="mt-0.5 text-ink">{open.completedOn ?? '—'}</div>
+                <div className="mt-0.5 text-ink">{open.completedOn ?? 'N/A'}</div>
               </div>
               <div>
                 <div className="text-[10px] uppercase tracking-wide text-ink-faint">Receipt</div>
@@ -800,7 +840,7 @@ export function OrdersPage({
                             ? 'short delivery'
                             : 'damaged'
                       }`
-                    : '—'}
+                    : 'N/A'}
                 </div>
               </div>
             </div>
@@ -828,7 +868,7 @@ export function OrdersPage({
                 <div className="space-y-3">
                   <div>
                     <label className={labelCls} htmlFor="dep-amt">
-                      Deposit received (GH¢) — up to {ghs(balance)} outstanding
+                      Deposit received (GH¢), up to {ghs(balance)} outstanding
                     </label>
                     <input
                       id="dep-amt"
@@ -848,7 +888,7 @@ export function OrdersPage({
                       <button
                         key={pct}
                         type="button"
-                        onClick={() => setAmount(String(Math.round(balanceOf(open) * pct * 0.01)))}
+                        onClick={() => setAmount(String(Math.round(balanceOf(open, data.cash) * pct * 0.01)))}
                         className="rounded-full border border-line-strong px-3 py-1.5 text-[11px] font-medium text-ink-soft transition hover:border-brand-400 hover:text-brand-600"
                       >
                         {pct}%
@@ -856,7 +896,7 @@ export function OrdersPage({
                     ))}
                     <button
                       type="button"
-                      onClick={() => setAmount(String(balanceOf(open)))}
+                      onClick={() => setAmount(String(balanceOf(open, data.cash)))}
                       className="rounded-full border border-line-strong px-3 py-1.5 text-[11px] font-medium text-ink-soft transition hover:border-brand-400 hover:text-brand-600"
                     >
                       Full balance
@@ -885,7 +925,7 @@ export function OrdersPage({
                 <div className="space-y-3">
                   <div>
                     <label className={labelCls} htmlFor="pay-amt">
-                      Extra payment (GH¢) — {ghs(balance)} outstanding
+                      Extra payment (GH¢), {ghs(balance)} outstanding
                     </label>
                     <input
                       id="pay-amt"
@@ -1008,7 +1048,7 @@ export function OrdersPage({
                 <div className="space-y-3">
                   <div>
                     <label className={labelCls} htmlFor="set-amt">
-                      Balance received (GH¢) — {ghs(balance)} outstanding
+                      Balance received (GH¢), {ghs(balance)} outstanding
                     </label>
                     <input
                       id="set-amt"
@@ -1191,12 +1231,12 @@ export function OrdersPage({
                     {open.stage === 'quoted' && 'Cash-flow rule: the deposit lands before we commit to a supplier.'}
                     {open.stage === 'deposit' &&
                       (open.depositGhs > 0
-                        ? 'Deposit is in — safe to place the supplier order.'
+                        ? 'Deposit is in. Safe to place the supplier order.'
                         : 'Playbook guard: no supplier order before the deposit is recorded.')}
-                    {open.stage === 'ordered' && 'On arrival, capture the receipt — completeness or discrepancy.'}
+                    {open.stage === 'ordered' && 'Balance is due before offloading. Capture the receipt on arrival.'}
                     {open.stage === 'delivered' &&
-                      (balance > 0 ? 'Goods delivered. Collect the balance to close the order.' : 'Fully paid — close the order.')}
-                    {open.stage === 'settled' && `Closed ${open.completedOn ?? ''} — receipt and cash both in.`}
+                      (balance > 0 ? 'Goods delivered. Collect the balance to close the order.' : 'Fully paid. Close the order.')}
+                    {open.stage === 'settled' && `Closed ${open.completedOn ?? ''}. Receipt and cash both in.`}
                   </p>
                   <div className="flex shrink-0 flex-wrap gap-2">
                     {open.stage === 'draft' && (
@@ -1283,7 +1323,7 @@ export function OrdersPage({
                           type="button"
                           onClick={() => {
                             setPanel('settle')
-                            setAmount(String(balanceOf(open)))
+                            setAmount(String(balanceOf(open, data.cash)))
                           }}
                           className="flex min-h-11 items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-medium text-on-primary transition hover:bg-primary-hover"
                         >
@@ -1296,7 +1336,7 @@ export function OrdersPage({
                             onOrderAction(
                               open.id,
                               { stage: 'settled', completedOn: open.completedOn ?? localDate() },
-                              { message: `${open.id} settled — cash complete.` },
+                              { message: `${open.id} settled. Cash complete.` },
                             )
                           }
                           className="flex min-h-11 items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-medium text-on-primary transition hover:bg-primary-hover"

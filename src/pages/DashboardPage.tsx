@@ -21,6 +21,7 @@ import type { Dataset } from '../lib/dataSource'
 import type { NotificationTarget } from '../lib/notifications'
 import { CHART_AXIS, CHART_GRID, CHART_TOOLTIP_STYLE } from '../lib/colors'
 import { EmptyState } from '../components/states'
+import { orderFlags, quoteFlags } from '../lib/rules'
 import {
   ORDER_STAGES,
   ORDER_STAGE_LABELS,
@@ -220,7 +221,33 @@ export function DashboardPage({
   const attention: AttentionItem[] = useMemo(() => {
     const nameOf = (id: string) => data.customers.find((c) => c.id === id)?.name ?? 'Customer'
     const items: AttentionItem[] = []
-    for (const q of data.quotes.filter((q) => q.status === 'sent')) {
+    // Business-rule breaks first: these cost money if ignored.
+    const ruleCtx = { orders: data.orders, cash: data.cash, quotes: data.quotes, prices: data.prices }
+    for (const o of data.orders) {
+      for (const f of orderFlags(o, ruleCtx)) {
+        items.push({
+          key: `r-${o.id}-${f.key}`,
+          tone: f.tone === 'danger' ? 'rose' : 'amber',
+          icon: f.key === 'late' ? Clock : f.key === 'stale_price' ? AlertTriangle : Wallet,
+          text: `${o.id} · ${f.label}`,
+          age: f.short,
+          target: 'orders',
+        })
+      }
+    }
+    for (const q of data.quotes) {
+      for (const f of quoteFlags(q)) {
+        items.push({
+          key: `rq-${q.id}`,
+          tone: 'amber',
+          icon: Clock,
+          text: `${q.id} · ${f.label}`,
+          age: f.short,
+          target: 'quotes',
+        })
+      }
+    }
+    for (const q of data.quotes.filter((q) => q.status === 'sent' && quoteFlags(q).length === 0)) {
       const age = daysSince(q.sentOn)
       if (age >= 3) {
         items.push({
@@ -233,7 +260,7 @@ export function DashboardPage({
         })
       }
     }
-    for (const o of data.orders.filter((o) => o.stage === 'quoted')) {
+    for (const o of data.orders.filter((o) => o.stage === 'quoted' && orderFlags(o, ruleCtx).length === 0)) {
       const age = daysSince(o.receivedOn)
       if (age >= 2) {
         items.push({
@@ -249,7 +276,7 @@ export function DashboardPage({
     const staleCount = data.prices.filter((p) => isPriceStale(p)).length
     if (staleCount > 0) {
       items.push({
-        key: 'stale',
+        key: 'stale-prices',
         tone: 'amber',
         icon: AlertTriangle,
         text: `${staleCount} price${staleCount === 1 ? '' : 's'} older than ${PRICE_STALE_DAYS} days`,

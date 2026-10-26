@@ -186,3 +186,29 @@ describe('mergeSim', () => {
     expect(row?.capturedOn).toBe('2099-01-01')
   })
 })
+
+describe('simulation follows the business rules', () => {
+  it('confirms orders with at least the 70% (or 50% established) deposit and never offloads unpaid orders', () => {
+    // Seeded rng so the run is reproducible.
+    let seed = 7
+    const rng = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+    let sim: SimState = EMPTY_SIM
+    for (let i = 0; i < 400; i++) {
+      const data = snapshot(sim)
+      const event = pickSimEvent(data, rng)
+      if (!event) continue
+      if (event.type === 'deposit') {
+        const order = data.orders.find((o) => o.id === event.orderId)!
+        expect(event.patch.depositGhs!).toBeGreaterThanOrEqual(Math.min(order.valueGhs, order.valueGhs * 0.5))
+      }
+      if (event.type === 'stage' && event.patch.stage === 'delivered') {
+        const order = data.orders.find((o) => o.id === event.orderId)!
+        const paid =
+          order.depositGhs +
+          data.cash.filter((c) => c.orderId === order.id && c.kind === 'balance_in').reduce((s, c) => s + c.ghs, 0)
+        expect(paid).toBeGreaterThanOrEqual(order.valueGhs)
+      }
+      sim = applySimEvent(sim, event)
+    }
+  })
+})
