@@ -64,11 +64,14 @@ offloaded before the customer has paid.
   `src/lib/compare.ts` spreads it across the quantity. The cheapest supplier
   can change with quantity; the quote builder reuses the same function, so a
   quote can never disagree with the comparison screen.
-- **Private data never lives in the code.** The real dataset and the PIN hash
-  used to ship in the JavaScript bundle behind a client-side check. Now the PIN
-  hash exists only as worker secrets, the real dataset only in the D1 database
-  (loaded from a git-ignored local file), the PIN is verified by the worker,
-  and a build step fails if real data ever appears in `dist/`.
+- **Private data never lives in the code.** The real dataset and an access
+  PIN used to ship in the JavaScript bundle behind a client-side check. Now
+  the real dataset lives only in the D1 database (loaded from a git-ignored
+  local file), every staff member signs in with their own account checked by
+  the worker, and a build step fails if real data ever appears in `dist/`.
+- **Three positions, one permission table.** Product Lead, Operations Manager
+  and Secretary each see only their pages and actions (`src/lib/permissions.ts`).
+  The Product Lead manages the team from the Team page.
 - **Demo that never goes stale.** Every demo date is an offset from today, so
   the public demo always looks like this week's operations.
 
@@ -107,7 +110,7 @@ flowchart LR
   subgraph Browser
     SPA["React SPA<br/>(Vite build)"]
     LS[("localStorage<br/>per-mode records")]
-    SS[("sessionStorage<br/>Real session token")]
+    SS[("localStorage<br/>staff session token")]
   end
 
   subgraph Vercel["Vercel (adensaops.com)"]
@@ -116,9 +119,9 @@ flowchart LR
   end
 
   subgraph Cloudflare["Cloudflare Worker"]
-    API["worker.js<br/>/api/session<br/>/api/real-dataset<br/>/api/records"]
-    Secrets[("Worker secrets<br/>PIN hash, session key")]
-    D1[("D1<br/>datasets + records")]
+    API["worker.js<br/>/api/auth, /api/staff<br/>/api/real-dataset<br/>/api/records"]
+    Secrets[("Worker secret<br/>session key")]
+    D1[("D1<br/>staff, datasets, records")]
   end
 
   SPA -- "GET pages" --> Static
@@ -157,7 +160,9 @@ Business logic is plain, tested TypeScript in `src/lib/`:
 
 | Endpoint | Purpose | Auth |
 |---|---|---|
-| `POST /api/session` | Verify the Real-mode PIN (PBKDF2-SHA256), return a 12-hour HMAC-signed token | Lockout after 5 wrong PINs per address |
+| `POST /api/auth/login` | Email + password (PBKDF2-SHA256), returns a 12-hour HMAC-signed token | Lockout after 5 failures per address and email |
+| `GET /api/auth/me` · `POST /api/auth/password` | Current account · change own password | Bearer token |
+| `GET/POST /api/staff` · `PATCH /api/staff/:id` | List, add, change role, reset password, deactivate | Product Lead only |
 | `GET /api/real-dataset` | The real dataset | Bearer token |
 | `GET/PUT /api/records?mode=demo` | Demo operator records | Origin allowlist for writes |
 | `GET/PUT /api/records?mode=real` | Real operator records | Bearer token |
@@ -196,16 +201,20 @@ Nothing private is in this repository. Setting up (or rotating) the real
 platform, from a machine logged in with `npx wrangler login`:
 
 ```bash
-npm run set-pin                 # choose the PIN; stores its hash as worker secrets
-                                # (REAL_PIN_HASH, REAL_PIN_SALT, REAL_PIN_ITERATIONS,
-                                # SESSION_SECRET) and signs everyone out
-npm run seed:real               # loads private/real-dataset.js into D1 (row "real")
+npx wrangler secret put SESSION_SECRET   # 32+ random characters; changing it signs everyone out
+npm run seed:real                         # loads private/real-dataset.js into D1 (row "real")
+npm run staff -- add --email <email> --name "<full name>" --role product_lead
+                                          # first account; prompts for a temporary password
 ```
 
 `private/` is git-ignored: keep the real dataset there (a `.js` default export
 or a `.json` file with the `Dataset` shape). Without the secrets the worker
 answers sign-in with 503 "not configured"; without the seed, the real dataset
-endpoint answers 503 "not loaded". The PIN itself is never stored anywhere.
+endpoint answers 503 "not loaded". Passwords are stored only as salted hashes
+in D1. Every new account must choose its own password at first sign-in, and a
+role change, reset or deactivation signs that person out at once. The
+Product Lead adds everyone else from the Team page; `npm run staff -- reset
+--email <email>` recovers a Product Lead who is locked out.
 
 ## Metric definitions
 
@@ -250,7 +259,7 @@ VITE_EDITION=app API_PROXY=http://localhost:8787 npm run dev
 
 | Script | What it does |
 |---|---|
-| `npm run set-pin` | Choose the app-edition PIN; stores its hash as worker secrets (`-- --local` writes `.dev.vars`) |
+| `npm run staff` | Staff accounts in D1: `add`, `reset`, `list` (`-- --local` for `wrangler dev`) |
 | `npm run seed:real` | Load the real dataset from `private/` into D1 (`-- --local` for `wrangler dev`) |
 | `npm run brand:assets` | Regenerate favicons, lockups and the Open Graph image |
 
@@ -260,14 +269,14 @@ VITE_EDITION=app API_PROXY=http://localhost:8787 npm run dev
 src/
   App.tsx              shell, navigation, theme, sign-in gate, record mutations
   editions/            demo.ts and app.ts: each edition's data, sync and session
-  pages/               Dashboard, Orders, Suppliers, Compare, Cash, Customers
+  pages/               Dashboard, Orders, Suppliers, Compare, Cash, Customers, Team
   quoteBuilder.tsx     Quotes list, quote form, printable sheet
   components/          brand, charts, map, tables, dialogs, About panel
   lib/                 rules, metrics, compare, quote, format, sync, simulation
   data/demo.ts         synthetic demo seed (relative dates)
 private/               real dataset, local only (git-ignored), loaded into D1
-worker.js              Cloudflare Worker API
-scripts/               brand assets, PIN, bundle privacy check
+worker.js, server/      Cloudflare Worker API, staff accounts and sessions
+scripts/               brand assets, staff accounts, bundle privacy check
 e2e/                   Playwright journeys
 ```
 

@@ -155,13 +155,17 @@
   example per flag (guarded by `src/data/demo.test.ts`). The simulation
   follows the rules too.
 - The app edition NEVER shows simulated data anywhere, including notifications.
-- The app edition is PIN-gated and verified by the worker (`POST /api/session`),
-  which issues a signed session token (to be replaced by staff accounts).
-- No private data in the repository, ever: the PIN hash exists only as worker
-  secrets (`npm run set-pin`), the real dataset only in D1 (`npm run
-  seed:real` from the git-ignored `private/` folder), served by
-  `GET /api/real-dataset`. Never commit real records, a PIN or its hash, and
-  never add a fallback hash to the code. `npm run build` fails if real data
+- The app edition opens on staff sign-in (email + password, `server/staff.js`).
+  Three positions: Product Lead, Operations Manager, Secretary. What each may
+  see and do lives only in `src/lib/permissions.ts`; gate pages and actions
+  with `can(role, ...)`, never by checking role names inline. The Product Lead
+  manages accounts on the Team page; `npm run staff` creates the first one.
+- No private data in the repository, ever: the only secret is the worker's
+  `SESSION_SECRET`, passwords are salted hashes in D1, and the real dataset is
+  only in D1 (`npm run seed:real` from the git-ignored `private/` folder),
+  served by `GET /api/real-dataset` to signed-in staff. Never commit real
+  records, passwords, hashes or a session secret, and never add a fallback
+  account to the code. `npm run build` fails if real data
   appears in `dist/`.
 - The browser reaches the API same-origin (`/api`): Vercel rewrites it to the
   worker. Keep `adensaops.com` and `app.adensaops.com` in the worker's CORS

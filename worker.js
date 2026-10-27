@@ -1,34 +1,33 @@
-// AdensaOps worker: D1-backed record sync, PIN-verified Real mode, static SPA.
+// AdensaOps worker: staff sign-in, D1-backed records, real dataset, static SPA.
 //
 // API:
-//   OPTIONS /api/*                        -> CORS preflight (allowlisted origins)
-//   POST /api/session      { pin }        -> { ok, token, expiresAt } | 401 | 429
-//   GET  /api/real-dataset  (Bearer token) -> { ok, dataset }   | 401 | 503
-//   GET  /api/records?mode=demo|real       -> { mode, records|null, updatedAt|null }
-//   PUT  /api/records?mode=demo|real       -> { ok: true, updatedAt }
-//   (mode=real requires the Bearer token on both GET and PUT)
+//   OPTIONS /api/*                          -> CORS preflight (allowlisted origins)
+//   POST  /api/auth/login, GET /api/auth/me, POST /api/auth/password
+//   GET/POST /api/staff, PATCH /api/staff/:id   (Product Lead only)
+//         -> staff accounts and sessions, see server/staff.js
+//   GET  /api/real-dataset   (staff session) -> { ok, dataset }       | 401 | 503
+//   GET  /api/records?mode=demo|real         -> { mode, records|null, updatedAt|null }
+//   PUT  /api/records?mode=demo|real         -> { ok: true, updatedAt }
+//   (mode=real requires a staff session on both GET and PUT)
 //
 // Records are the operator-created UI records (quotes, orders, customers,
-// inquiries, cash, status overrides). One JSON document per data mode, so the
-// demo/real isolation guarantee holds server-side too. The client stays
-// local-first: it renders from localStorage immediately and treats any API
-// failure as "no backend yet".
+// inquiries, cash, status overrides). One JSON document per data mode.
 //
 // Security posture:
-// - Real mode is verified HERE: the PIN is checked against a PBKDF2-SHA256
-//   hash held only in worker secrets (REAL_PIN_HASH / REAL_PIN_SALT /
-//   REAL_PIN_ITERATIONS), and a short-lived HMAC-signed session token
-//   unlocks the real dataset and real records. Without the secrets, sign-in
-//   answers 503 "not configured": there is no fallback hash in the code.
+// - Each person signs in with their own account (server/staff.js): PBKDF2
+//   password hashes in D1, HMAC-signed sessions keyed by the SESSION_SECRET
+//   worker secret, re-checked against the account on every request so a
+//   deactivation, role change or password reset applies at once. Without
+//   SESSION_SECRET, sign-in answers 503 "not configured".
 // - The real dataset lives in D1 (table `datasets`, loaded with
-//   `npm run seed:real` from a local file that is never committed). Neither
-//   it nor the PIN hash is in this repository or the frontend bundle.
-// - Repeated wrong PINs from one address are locked out for a minute
-//   (best effort, per isolate) and every failure is slowed down.
+//   `npm run seed:real` from a local file that is never committed).
+// - Repeated wrong passwords are slowed down and locked out (best effort).
 // - Writes are rejected when the Origin header is neither same-origin nor an
 //   allowlisted frontend (CSRF guard); CORS answers only allowlisted origins.
 // - mode is an allowlist, payload shape is validated and size-capped,
 //   responses are no-store.
+
+import { STAFF_SCHEMA, currentStaff, handleStaffApi } from './server/staff.js'
 
 const MODES = new Set(['demo', 'real'])
 const MAX_BODY_BYTES = 1_000_000
@@ -92,7 +91,7 @@ function preflightResponse(corsOrigin) {
     status: 204,
     headers: {
       'access-control-allow-origin': corsOrigin,
-      'access-control-allow-methods': 'GET, PUT, POST, OPTIONS',
+      'access-control-allow-methods': 'GET, PUT, POST, PATCH, OPTIONS',
       'access-control-allow-headers': 'accept, content-type, authorization',
       'access-control-max-age': '86400',
       vary: 'Origin',
@@ -156,137 +155,18 @@ async function ensureSchema(db) {
   await db.exec(
     'CREATE TABLE IF NOT EXISTS datasets (name TEXT PRIMARY KEY, payload TEXT NOT NULL, updated_at TEXT NOT NULL)',
   )
+  // Staff accounts (server/staff.js).
+  await db.exec(STAFF_SCHEMA)
   schemaReady.add(db)
 }
 
-/* ------------------------------ Real-mode auth ------------------------------ */
-
-const SESSION_TTL_MS = 12 * 60 * 60 * 1000
-const MAX_FAILURES = 5
-const LOCKOUT_MS = 60 * 1000
-const FAIL_DELAY_MS = 400
-/** Failed PIN attempts per client address (best effort, per isolate). */
-const failures = new Map()
-
-const enc = new TextEncoder()
-
-function hexToBytes(hex) {
-  const out = new Uint8Array(hex.length / 2)
-  for (let i = 0; i < out.length; i++) out[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16)
-  return out
-}
-
-function toHex(buf) {
-  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('')
-}
-
-/** Constant-time comparison of two strings of equal expected length. */
-function safeEqual(a, b) {
-  if (typeof a !== 'string' || typeof b !== 'string' || a.length !== b.length) return false
-  let diff = 0
-  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i)
-  return diff === 0
-}
-
-/** PIN hash settings from worker secrets; null until they are set. */
-function pinConfig(env) {
-  const hash = env?.REAL_PIN_HASH
-  const salt = env?.REAL_PIN_SALT
-  const iterations = Number(env?.REAL_PIN_ITERATIONS) || 310_000
-  if (typeof hash !== 'string' || !/^[0-9a-f]{64}$/i.test(hash)) return null
-  if (typeof salt !== 'string' || !/^[0-9a-f]+$/i.test(salt) || salt.length % 2 !== 0) return null
-  return { hash: hash.toLowerCase(), salt, iterations }
-}
-
-async function verifyPin(env, pin) {
-  const config = pinConfig(env)
-  if (!config) return false
-  const { hash, salt, iterations } = config
-  const key = await crypto.subtle.importKey('raw', enc.encode(pin), 'PBKDF2', false, ['deriveBits'])
-  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt: hexToBytes(salt), iterations, hash: 'SHA-256' }, key, 256)
-  return safeEqual(toHex(bits), hash)
-}
-
-/** HMAC key for session tokens: SESSION_SECRET, else derived from the PIN hash (a PIN change logs everyone out). */
-function hmacKey(env) {
-  const config = pinConfig(env)
-  // Without PIN secrets no token can be issued; the fallback key only keeps
-  // verifyToken well-defined (it then never matches an issued token).
-  const secret = env?.SESSION_SECRET || `adensaops-session:${config?.hash ?? 'unconfigured'}:${config?.salt ?? ''}`
-  return crypto.subtle.importKey('raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
-}
-
-async function sign(env, message) {
-  const sig = await crypto.subtle.sign('HMAC', await hmacKey(env), enc.encode(message))
-  return toHex(sig)
-}
-
-export async function issueToken(env, now = Date.now()) {
-  const expiresAt = now + SESSION_TTL_MS
-  const body = `real.${expiresAt}`
-  return { token: `${body}.${await sign(env, body)}`, expiresAt }
-}
-
-export async function verifyToken(env, token, now = Date.now()) {
-  if (typeof token !== 'string' || !pinConfig(env)) return false
-  const parts = token.split('.')
-  if (parts.length !== 3 || parts[0] !== 'real') return false
-  const expiresAt = Number(parts[1])
-  if (!Number.isFinite(expiresAt) || expiresAt <= now) return false
-  return safeEqual(parts[2], await sign(env, `${parts[0]}.${parts[1]}`))
-}
-
-function bearer(request) {
-  const h = request.headers.get('authorization') ?? ''
-  return h.startsWith('Bearer ') ? h.slice(7).trim() : null
-}
-
-async function isRealSession(request, env) {
-  return verifyToken(env, bearer(request))
-}
-
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
-
-async function handleSession(request, env, url, corsOrigin) {
-  if (request.method !== 'POST') return json({ ok: false, error: 'method not allowed' }, 405, corsOrigin)
-  if (!isWriteAllowed(request, url)) return json({ ok: false, error: 'cross-origin requests are not allowed' }, 403, corsOrigin)
-
-  if (!pinConfig(env)) return json({ ok: false, error: 'sign-in is not configured' }, 503, corsOrigin)
-
-  const client = request.headers.get('cf-connecting-ip') ?? 'unknown'
-  const now = Date.now()
-  const record = failures.get(client)
-  if (record && record.until > now) {
-    return json({ ok: false, error: 'too many attempts, try again in a minute' }, 429, corsOrigin)
-  }
-
-  let pin
-  try {
-    const body = JSON.parse(await request.text())
-    pin = body?.pin
-  } catch {
-    return json({ ok: false, error: 'body must be JSON' }, 400, corsOrigin)
-  }
-  if (typeof pin !== 'string' || pin.length === 0 || pin.length > 128) {
-    return json({ ok: false, error: 'pin is required' }, 400, corsOrigin)
-  }
-
-  if (!(await verifyPin(env, pin))) {
-    const count = (record && record.until <= now && record.count >= MAX_FAILURES ? 0 : (record?.count ?? 0)) + 1
-    failures.set(client, { count, until: count >= MAX_FAILURES ? now + LOCKOUT_MS : 0 })
-    await sleep(FAIL_DELAY_MS)
-    return json({ ok: false, error: 'incorrect PIN' }, 401, corsOrigin)
-  }
-  failures.delete(client)
-  const { token, expiresAt } = await issueToken(env, now)
-  return json({ ok: true, token, expiresAt }, 200, corsOrigin)
-}
+/* ------------------------------- Real dataset ------------------------------- */
 
 async function handleRealDataset(request, env, corsOrigin) {
   if (request.method !== 'GET') return json({ ok: false, error: 'method not allowed' }, 405, corsOrigin)
-  if (!(await isRealSession(request, env))) return json({ ok: false, error: 'PIN session required' }, 401, corsOrigin)
   if (!env || !env.DB) return json({ ok: false, error: 'database unavailable' }, 503, corsOrigin)
   await ensureSchema(env.DB)
+  if (!(await currentStaff(request, env))) return json({ ok: false, error: 'sign-in required' }, 401, corsOrigin)
   const row = await env.DB.prepare('SELECT payload FROM datasets WHERE name = ?').bind('real').first()
   let dataset = null
   try {
@@ -303,14 +183,14 @@ async function handleRealDataset(request, env, corsOrigin) {
 async function handleApi(request, env, url, corsOrigin) {
   const mode = url.searchParams.get('mode') ?? ''
   if (!MODES.has(mode)) return json({ ok: false, error: 'mode must be "demo" or "real"' }, 400, corsOrigin)
-  // Real records are as private as the real dataset: PIN session only.
-  if (mode === 'real' && (request.method === 'GET' || request.method === 'PUT') && !(await isRealSession(request, env))) {
-    return json({ ok: false, error: 'PIN session required' }, 401, corsOrigin)
-  }
   if (!env || !env.DB) return json({ ok: false, error: 'database unavailable' }, 503, corsOrigin)
 
   const db = env.DB
   await ensureSchema(db)
+  // Real records are as private as the real dataset: staff session only.
+  if (mode === 'real' && !(await currentStaff(request, env))) {
+    return json({ ok: false, error: 'sign-in required' }, 401, corsOrigin)
+  }
 
   if (request.method === 'GET') {
     const row = await db.prepare('SELECT payload, updated_at FROM records WHERE mode = ?').bind(mode).first()
@@ -372,7 +252,13 @@ export default {
       const corsOrigin = corsAllowedOrigin(request, url)
       if (request.method === 'OPTIONS') return preflightResponse(corsOrigin)
       try {
-        if (url.pathname === '/api/session') return await handleSession(request, env, url, corsOrigin)
+        if (url.pathname.startsWith('/api/auth/') || url.pathname === '/api/staff' || url.pathname.startsWith('/api/staff/')) {
+          if (request.method !== 'GET' && !isWriteAllowed(request, url)) {
+            return json({ ok: false, error: 'cross-origin requests are not allowed' }, 403, corsOrigin)
+          }
+          if (env?.DB) await ensureSchema(env.DB)
+          return await handleStaffApi(request, env, url, (body, status = 200) => json(body, status, corsOrigin))
+        }
         if (url.pathname === '/api/real-dataset') return await handleRealDataset(request, env, corsOrigin)
         if (url.pathname !== '/api/records') return json({ ok: false, error: 'not found' }, 404, corsOrigin)
         return await handleApi(request, env, url, corsOrigin)

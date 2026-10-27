@@ -8,8 +8,10 @@ afterEach(() => {
   cleanup()
 })
 
-// localStorage is app state (data mode, local records, theme): isolate tests.
+// localStorage is app state (local records, theme, session): isolate tests.
+// Node-environment files (the worker tests) have no DOM, so skip it there.
 beforeEach(() => {
+  if (typeof localStorage === 'undefined') return
   localStorage.clear()
   document.documentElement.classList.remove('dark')
 })

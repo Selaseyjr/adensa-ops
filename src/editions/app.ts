@@ -1,12 +1,12 @@
-// App edition: the real platform. Real data comes from the API with the
-// signed session token; there is no demo seed and no simulation in this
+// App edition: the real platform. Staff sign in with their own accounts
+// (lib/staffAuth); real data comes from the API with the signed session; there is no demo seed and no simulation in this
 // bundle, and the bell never shows simulated events.
 
-import { useEffect, useMemo, useState } from 'react'
+import { lazy, useEffect, useMemo, useState } from 'react'
 import type { Dataset } from '../lib/dataSource'
 import { mergeDataset } from '../lib/localData'
-import { fetchRealDataset, isRealUnlocked, lockReal } from '../lib/realAccess'
-import { SignInScreen } from '../components/SignIn'
+import { fetchRealDataset, getStaffUser, refreshUser, signOut } from '../lib/staffAuth'
+import { ChangePasswordForm, FirstPasswordScreen, SignInScreen } from '../components/SignIn'
 import { createPushQueue, hydrateRecords } from '../lib/remote'
 import type { DataStatus, Edition } from './types'
 
@@ -31,12 +31,18 @@ function emptyDataset(): Dataset {
 
 const NO_NOTIFICATIONS: never[] = []
 
+const TeamPage = lazy(() => import('../pages/TeamPage').then((m) => ({ default: m.TeamPage })))
+
 const edition: Edition = {
   name: 'app',
   mode: 'real',
   SignIn: SignInScreen,
-  isSignedIn: isRealUnlocked,
-  signOut: lockReal,
+  FirstPassword: FirstPasswordScreen,
+  ChangePassword: ChangePasswordForm,
+  TeamPage,
+  currentUser: getStaffUser,
+  refreshUser,
+  signOut,
   showcase: false,
   useEditionData(local) {
     const [seed, setSeed] = useState<Dataset | null>(null)

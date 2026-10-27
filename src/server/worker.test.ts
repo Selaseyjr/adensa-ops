@@ -4,7 +4,7 @@
 // with `wrangler dev` (local Miniflare) before every deploy.
 
 import { describe, expect, it, vi } from 'vitest'
-import worker, { issueToken, verifyToken } from '../../worker.js'
+import worker from '../../worker.js'
 
 interface FakeDB {
   rows: Map<string, { payload: string; updated_at: string }>
@@ -53,31 +53,11 @@ function fakeDb(): FakeDB {
 
 const ASSETS = { fetch: vi.fn(async () => new Response('asset')) }
 
-// A throwaway PIN for tests: the worker reads its hash from env, exactly as
-// production reads the REAL_PIN_* secrets. (The real PIN is never in source.)
-const TEST_PIN = 'test-pin-4821'
-const TEST_SALT = '00112233445566778899aabbccddeeff'
-const TEST_ITERATIONS = 1000
-let testHash = ''
-async function pinEnv() {
-  if (!testHash) {
-    const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(TEST_PIN), 'PBKDF2', false, ['deriveBits'])
-    const salt = new Uint8Array(TEST_SALT.match(/../g)!.map((h) => parseInt(h, 16)))
-    const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt, iterations: TEST_ITERATIONS, hash: 'SHA-256' }, key, 256)
-    testHash = [...new Uint8Array(bits)].map((b) => b.toString(16).padStart(2, '0')).join('')
-  }
-  return { REAL_PIN_HASH: testHash, REAL_PIN_SALT: TEST_SALT, REAL_PIN_ITERATIONS: String(TEST_ITERATIONS) }
-}
-
-/** Call the worker with a fake env; returns the response and the db used. */
-async function call(path: string, init: RequestInit = {}, db: FakeDB = fakeDb(), secrets = true) {
+/** Call the worker with a fake env (records tests; staff auth lives in staff.test.ts). */
+async function call(path: string, init: RequestInit = {}, db: FakeDB = fakeDb()) {
   const request = new Request(`https://ops.example.com${path}`, init)
-  const env = { DB: db, ASSETS, ...(secrets ? await pinEnv() : {}) } as never
+  const env = { DB: db, ASSETS, SESSION_SECRET: 'x'.repeat(40) } as never
   return worker.fetch(request, env)
-}
-
-async function realToken(): Promise<string> {
-  return (await issueToken(await pinEnv())).token
 }
 
 describe('worker: routing', () => {
@@ -164,26 +144,18 @@ describe('worker: cross-origin guard', () => {
 })
 
 describe('worker: D1 round trip', () => {
-  it('PUTs then GETs records back per mode, keeping modes isolated', async () => {
+  it('PUTs then GETs demo records, and never serves real records without sign-in', async () => {
     const db = fakeDb()
     const payload = { quotes: [{ id: 'QT-901', customerId: 'c1' }] }
 
-    const auth = { authorization: `Bearer ${await realToken()}` }
-    const put = await call('/api/records?mode=real', { method: 'PUT', headers: auth, body: JSON.stringify(payload) }, db)
+    const put = await call('/api/records?mode=demo', { method: 'PUT', body: JSON.stringify(payload) }, db)
     expect(put.status).toBe(200)
-    expect((await put.json()).ok).toBe(true)
+    const body = (await (await call('/api/records?mode=demo', {}, db)).json()) as { records: { quotes: unknown[] } }
+    expect(body.records.quotes).toHaveLength(1)
 
-    const getReal = await call('/api/records?mode=real', { headers: auth }, db)
-    const realBody = (await getReal.json()) as {
-      ok: boolean
-      records: { quotes: unknown[] }
-    }
-    expect(realBody.ok).toBe(true)
-    expect(realBody.records.quotes).toHaveLength(1)
-
-    const getDemo = await call('/api/records?mode=demo', {}, db)
-    const demoBody = (await getDemo.json()) as { records: unknown }
-    expect(demoBody.records).toBeNull()
+    expect((await call('/api/records?mode=real', {}, db)).status).toBe(401)
+    expect((await call('/api/records?mode=real', { method: 'PUT', body: '{}' }, db)).status).toBe(401)
+    expect(db.rows.has('real')).toBe(false)
 
     // Schema initialised exactly once across requests.
     expect(db.execCalls.filter((sql) => sql.includes('CREATE TABLE IF NOT EXISTS records'))).toHaveLength(1)
@@ -279,80 +251,18 @@ describe('worker: CORS for the Vercel frontend', () => {
 })
 
 
-describe('worker: Real mode is verified server-side', () => {
-  const post = (body: unknown, headers: Record<string, string> = {}) =>
-    call('/api/session', { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) })
-
-  it('issues a session token for the right PIN only', async () => {
-    const bad = await post({ pin: 'wrong-pin' }, { 'cf-connecting-ip': '198.51.100.1' })
-    expect(bad.status).toBe(401)
-    const good = await post({ pin: TEST_PIN }, { 'cf-connecting-ip': '198.51.100.2' })
-    expect(good.status).toBe(200)
-    const body = (await good.json()) as { ok: boolean; token: string; expiresAt: number }
-    expect(body.ok).toBe(true)
-    expect(await verifyToken(await pinEnv(), body.token)).toBe(true)
-    expect(body.expiresAt).toBeGreaterThan(Date.now())
+describe('worker: production domains and routing', () => {
+  it('allows the production and app domains through CORS', async () => {
+    for (const origin of ['https://adensaops.com', 'https://app.adensaops.com']) {
+      const res = await call('/api/auth/login', { method: 'OPTIONS', headers: { origin } })
+      expect(res.status).toBe(204)
+      expect(res.headers.get('access-control-allow-origin')).toBe(origin)
+      expect(res.headers.get('access-control-allow-headers')).toContain('authorization')
+    }
   })
 
-  it('locks an address out after repeated wrong PINs', async () => {
-    const ip = { 'cf-connecting-ip': '198.51.100.9' }
-    for (let i = 0; i < 5; i++) expect((await post({ pin: `nope-${i}` }, ip)).status).toBe(401)
-    expect((await post({ pin: TEST_PIN }, ip)).status).toBe(429)
-  }, 15_000)
-
-  it('rejects malformed bodies and cross-origin session requests', async () => {
-    expect((await post({})).status).toBe(400)
-    expect((await post({ pin: TEST_PIN }, { origin: 'https://evil.example' })).status).toBe(403)
-  })
-
-  it('serves the real dataset from D1 only to a valid session', async () => {
-    const db = fakeDb()
-    db.datasets.set('real', { payload: JSON.stringify({ suppliers: [{ id: 'sup-x' }] }) })
-    expect((await call('/api/real-dataset', {}, db)).status).toBe(401)
-    expect(
-      (await call('/api/real-dataset', { headers: { authorization: 'Bearer real.9999999999999.forged' } }, db)).status,
-    ).toBe(401)
-    const res = await call('/api/real-dataset', { headers: { authorization: `Bearer ${await realToken()}` } }, db)
-    expect(res.status).toBe(200)
-    const body = (await res.json()) as { dataset: { suppliers: unknown[] } }
-    expect(body.dataset.suppliers).toEqual([{ id: 'sup-x' }])
-  })
-
-  it('reports a dataset that has not been loaded yet', async () => {
-    const res = await call('/api/real-dataset', { headers: { authorization: `Bearer ${await realToken()}` } })
-    expect(res.status).toBe(503)
-    expect(((await res.json()) as { error: string }).error).toMatch(/not loaded/)
-  })
-
-  it('refuses sign-in until the PIN secrets are set (no hash in the code)', async () => {
-    const res = await call(
-      '/api/session',
-      { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pin: TEST_PIN }) },
-      fakeDb(),
-      false,
-    )
-    expect(res.status).toBe(503)
-    // A token minted under other secrets is worthless without them.
-    expect(await verifyToken({}, await realToken())).toBe(false)
-  })
-
-  it('rejects expired tokens', async () => {
-    const env = await pinEnv()
-    const { token } = await issueToken(env, Date.now() - 13 * 60 * 60 * 1000)
-    expect(await verifyToken(env, token)).toBe(false)
-  })
-
-  it('requires the session for real records but not demo records', async () => {
-    expect((await call('/api/records?mode=real')).status).toBe(401)
-    expect((await call('/api/records?mode=real', { method: 'PUT', body: '{}' })).status).toBe(401)
-    expect((await call('/api/records?mode=demo')).status).toBe(200)
-  })
-
-  it('allows the production domain through CORS', async () => {
-    const res = await call('/api/session', { method: 'OPTIONS', headers: { origin: 'https://adensaops.com' } })
-    expect(res.status).toBe(204)
-    expect(res.headers.get('access-control-allow-origin')).toBe('https://adensaops.com')
-    expect(res.headers.get('access-control-allow-headers')).toContain('authorization')
+  it('has no PIN endpoint any more', async () => {
+    expect((await call('/api/session', { method: 'POST', body: '{"pin":"x"}' })).status).toBe(404)
   })
 
   it('404s unknown API paths instead of treating them as records', async () => {

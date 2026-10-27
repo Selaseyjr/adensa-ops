@@ -5,6 +5,8 @@ import {
   FileText,
   LayoutDashboard,
   LogOut,
+  KeyRound,
+  UserCog,
   Menu,
   Moon,
   Plus,
@@ -34,6 +36,8 @@ import { useNotifications } from './lib/notifications'
 import { daysSince, type CashEntry, type Customer, type Order, type Quote, type QuoteStatus } from './types'
 import { AdensaLogo } from './components/brand'
 import { NotificationsBell } from './components/NotificationsBell'
+import { can, ROLE_LABELS, type Permission, type StaffUser } from './lib/permissions'
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from './components/ui/dialog'
 import { AboutProjectDialog, AppFooter, hasSeenAbout } from './components/AboutProject'
 // Route-level chunks: each page (and its heavy chart/map vendor code) loads
 // only when navigated to, so the first paint ships the shell alone.
@@ -50,7 +54,7 @@ import { ErrorBoundary, PageSkeleton } from './components/states'
 import { ToastProvider, useToast } from './components/toast'
 import { CommandPalette } from './components/CommandPalette'
 
-type NavKey = 'dashboard' | 'suppliers' | 'customers' | 'compare' | 'quotes' | 'orders' | 'cash'
+type NavKey = 'dashboard' | 'suppliers' | 'customers' | 'compare' | 'quotes' | 'orders' | 'cash' | 'team'
 
 /** Canonical URL per tab - every page is deep-linkable and shareable. */
 const PATH_BY_KEY: Record<NavKey, string> = {
@@ -61,6 +65,7 @@ const PATH_BY_KEY: Record<NavKey, string> = {
   quotes: '/quotes',
   orders: '/orders',
   cash: '/cash',
+  team: '/team',
 }
 
 const KEY_BY_PATH: Record<string, NavKey> = Object.fromEntries(
@@ -91,7 +96,14 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     ],
   },
   { label: 'Money', items: [{ key: 'cash', label: 'Cash', icon: Wallet }] },
-  { label: 'People', items: [{ key: 'customers', label: 'Customers', icon: Users }] },
+  {
+    label: 'People',
+    items: [
+      { key: 'customers', label: 'Customers', icon: Users },
+      // Team management exists only in the app edition (real staff accounts).
+      ...(edition.TeamPage ? [{ key: 'team' as NavKey, label: 'Team', icon: UserCog }] : []),
+    ],
+  },
 ]
 
 const NAV: (NavItem & { group: string })[] = NAV_GROUPS.flatMap((g) =>
@@ -101,13 +113,17 @@ const NAV: (NavItem & { group: string })[] = NAV_GROUPS.flatMap((g) =>
 /** This build's data mode: demo for the public demo, real for the platform. */
 const mode = edition.mode
 
-function AppInner() {
+function AppInner({ user }: { user: StaffUser }) {
   const [theme, setThemeState] = useState<Theme>(getTheme)
   const location = useLocation()
   const navigate = useNavigate()
   // The URL is the source of truth: refresh, back/forward and shared links
   // all land on the right page.
   const page: NavKey = KEY_BY_PATH[location.pathname] ?? 'dashboard'
+  // What this person's position may open (the demo visitor sees everything).
+  const allowed = (key: NavKey) => (key !== 'team' || !!edition.TeamPage) && can(user.role, `view:${key}` as Permission)
+  const [accountOpen, setAccountOpen] = useState(false)
+  const [passwordOpen, setPasswordOpen] = useState(false)
   // Transitioned navigation: while a lazy chunk loads, the whole current
   // page (title + content) stays consistent instead of the header
   // switching ahead of the suspended route.
@@ -323,7 +339,7 @@ function AppInner() {
     )
   }
 
-  if (!pathKnown) return <Navigate to="/" replace />
+  if (!pathKnown || !allowed(page)) return <Navigate to="/" replace />
 
   return (
     <ThemeContext.Provider value={theme}>
@@ -388,7 +404,9 @@ function AppInner() {
             </div>
           </div>
           <nav aria-label="Main" className="flex-1 space-y-5 overflow-y-auto px-3 py-3">
-            {NAV_GROUPS.map((group) => (
+            {NAV_GROUPS.map((group) => ({ ...group, items: group.items.filter((i) => allowed(i.key)) }))
+              .filter((group) => group.items.length > 0)
+              .map((group) => (
               <div key={group.label}>
                 <div className="px-2.5 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-rail-ink-soft">
                   {group.label}
@@ -488,14 +506,57 @@ function AppInner() {
                   Demo
                 </span>
               ) : (
-                <button
-                  onClick={signOut}
-                  aria-label="Sign out"
-                  title="Sign out"
-                  className="flex h-9 w-9 items-center justify-center rounded-lg text-ink-soft transition hover:bg-subtle hover:text-ink"
-                >
-                  <LogOut size={16} aria-hidden="true" />
-                </button>
+                <div className="relative">
+                  <button
+                    onClick={() => setAccountOpen((v) => !v)}
+                    aria-label={`Account: ${user.name}, ${ROLE_LABELS[user.role]}`}
+                    aria-expanded={accountOpen}
+                    className="flex h-9 items-center gap-2 rounded-lg px-1.5 text-ink-soft transition hover:bg-subtle hover:text-ink"
+                  >
+                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-[11px] font-semibold text-on-primary">
+                      {user.name
+                        .split(' ')
+                        .map((w) => w[0])
+                        .slice(0, 2)
+                        .join('')
+                        .toUpperCase()}
+                    </span>
+                    <span className="hidden text-left leading-tight lg:block">
+                      <span className="block text-xs font-medium text-ink">{user.name}</span>
+                      <span className="block text-[10px] text-ink-faint">{ROLE_LABELS[user.role]}</span>
+                    </span>
+                  </button>
+                  {accountOpen && (
+                    <div
+                      role="menu"
+                      className="absolute right-0 top-11 z-30 w-56 rounded-xl border border-line bg-surface p-1.5 shadow-lg"
+                      onMouseLeave={() => setAccountOpen(false)}
+                    >
+                      <div className="px-2.5 py-2">
+                        <div className="truncate text-sm font-medium text-ink">{user.name}</div>
+                        <div className="truncate text-xs text-ink-faint">{user.email}</div>
+                        <div className="mt-1 text-[11px] font-medium text-brand-600">{ROLE_LABELS[user.role]}</div>
+                      </div>
+                      <button
+                        role="menuitem"
+                        onClick={() => {
+                          setAccountOpen(false)
+                          setPasswordOpen(true)
+                        }}
+                        className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm text-ink-soft transition hover:bg-subtle hover:text-ink"
+                      >
+                        <KeyRound size={14} aria-hidden="true" /> Change password
+                      </button>
+                      <button
+                        role="menuitem"
+                        onClick={signOut}
+                        className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm text-ink-soft transition hover:bg-subtle hover:text-ink"
+                      >
+                        <LogOut size={14} aria-hidden="true" /> Sign out
+                      </button>
+                    </div>
+                  )}
+                </div>
               )}
               {/* Notifications: the demo shows its simulated feed; the app never does */}
               <NotificationsBell
@@ -536,6 +597,7 @@ function AppInner() {
             {dataStatus === 'ready' && page === 'dashboard' && (
               <DashboardPage
                 data={data}
+                showCash={can(user.role, 'view:cash')}
                 onNavigate={(target) => setPage(target)}
                 onOpenOrder={(orderId) => {
                   setPendingOrderId(orderId)
@@ -556,6 +618,11 @@ function AppInner() {
             {dataStatus === 'ready' && page === 'orders' && (
               <OrdersPage
                 data={data}
+                permissions={{
+                  approve: can(user.role, 'orders:approve'),
+                  money: can(user.role, 'orders:money'),
+                  deliver: can(user.role, 'orders:deliver'),
+                }}
                 openOrderId={pendingOrderId}
                 onOpenOrderConsumed={() => setPendingOrderId(null)}
                 onNavigate={(target) => setPage(target)}
@@ -577,12 +644,29 @@ function AppInner() {
             )}
             </Suspense>
             </ErrorBoundary>
+            {dataStatus === 'ready' && page === 'team' && edition.TeamPage && <edition.TeamPage me={user} />}
             {edition.showcase && <AppFooter onAbout={() => setAboutOpen(true)} />}
           </main>
         </div>
       </div>
 
       {edition.showcase && <AboutProjectDialog open={aboutOpen} onClose={() => setAboutOpen(false)} />}
+
+      {edition.ChangePassword && (
+        <Dialog open={passwordOpen} onOpenChange={setPasswordOpen}>
+          <DialogContent className="w-[calc(100%-2rem)] max-w-sm gap-0">
+            <DialogTitle>Change password</DialogTitle>
+            <DialogDescription>Other sessions are signed out.</DialogDescription>
+            <edition.ChangePassword
+              onCancel={() => setPasswordOpen(false)}
+              onDone={() => {
+                setPasswordOpen(false)
+                toast.success('Password changed.')
+              }}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* Theme crossfade veil — sits above all, invisible except mid-swap */}
       <div id="theme-veil" aria-hidden="true" />
@@ -603,10 +687,27 @@ function AppInner() {
 
 /**
  * The app edition renders nothing but the sign-in screen until the worker
- * has verified the PIN; the demo edition opens straight into the console.
+ * has verified a staff account; the demo edition opens straight into the console.
+ */
+/**
+ * App edition: sign-in, then a forced password change for accounts still on
+ * a temporary password, then the console. The demo opens straight into it.
  */
 function Gate() {
-  const [signedIn, setSignedIn] = useState(() => edition.isSignedIn())
+  const [user, setUser] = useState<StaffUser | null>(() => edition.currentUser())
+
+  // Re-read the profile once: a role change or deactivation applies at once.
+  useEffect(() => {
+    if (!user) return
+    let cancelled = false
+    void edition.refreshUser().then((fresh) => {
+      if (!cancelled) setUser(fresh)
+    })
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Dismiss the loading splash once React has painted (sign-in or console).
   useEffect(() => {
@@ -617,9 +718,12 @@ function Gate() {
     return () => window.clearTimeout(t)
   }, [])
 
-  const SignIn = edition.SignIn
-  if (!signedIn && SignIn) return <SignIn onSignedIn={() => setSignedIn(true)} />
-  return <AppInner />
+  const { SignIn, FirstPassword } = edition
+  if (!user) return SignIn ? <SignIn onSignedIn={() => setUser(edition.currentUser())} /> : null
+  if (user.mustChangePassword && FirstPassword) {
+    return <FirstPassword name={user.name} onDone={() => setUser(edition.currentUser())} />
+  }
+  return <AppInner user={user} />
 }
 
 export default function App() {
