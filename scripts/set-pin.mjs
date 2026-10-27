@@ -1,10 +1,13 @@
 #!/usr/bin/env node
-// Regenerate the Real-mode PIN hash.
-// Usage:  npm run set-pin            (prompts, hides input)
-// Writes server/pin-hash.js (read by the worker, never shipped to browsers)
-// with a fresh salt + PBKDF2-SHA256 hash. In production you can instead set
-// REAL_PIN_HASH / REAL_PIN_SALT as worker secrets (see README).
-// The PIN itself is never written to disk — only its hash.
+// Set the app-edition sign-in PIN.
+// Usage:
+//   npm run set-pin              prompts (hidden), then stores the PBKDF2-SHA256
+//                                hash as worker secrets with `wrangler secret put`
+//   npm run set-pin -- --local   writes them to .dev.vars for `wrangler dev`
+//
+// Secrets set: REAL_PIN_HASH, REAL_PIN_SALT, REAL_PIN_ITERATIONS and a fresh
+// SESSION_SECRET (so every existing session is signed out). The PIN itself is
+// never written anywhere, and nothing is written into the repository.
 //
 // NOTE: the salt is passed to pbkdf2Sync as DECODED BYTES (Buffer.from hex),
 // not as the hex string — Web Crypto in the browser decodes it the same way,
@@ -12,9 +15,10 @@
 
 import { createInterface } from 'node:readline';
 import { pbkdf2Sync, randomBytes } from 'node:crypto';
-import { writeFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+
+const local = process.argv.includes('--local');
 
 const ITERATIONS = 310_000;
 
@@ -66,22 +70,30 @@ if (confirm !== pin) {
 const salt = randomBytes(16);
 const hash = pbkdf2Sync(pin, salt, ITERATIONS, 32, 'sha256').toString('hex');
 
-const file = join(dirname(fileURLToPath(import.meta.url)), '..', 'server', 'pin-hash.js');
-writeFileSync(
-  file,
-  `// Real-mode PIN, verified server-side by the worker (POST /api/session).
-// Only the PBKDF2 hash is stored; the PIN itself never appears in source.
-// This module is imported by worker.js only, never by the frontend bundle.
-//
-// Regenerate after changing the PIN:  npm run set-pin
-// (see scripts/set-pin.mjs)
+const secrets = {
+  REAL_PIN_HASH: hash,
+  REAL_PIN_SALT: salt.toString('hex'),
+  REAL_PIN_ITERATIONS: String(ITERATIONS),
+  SESSION_SECRET: randomBytes(32).toString('hex'),
+};
 
-export const PIN_SALT = '${salt.toString('hex')}'
-export const PIN_ITERATIONS = ${ITERATIONS.toLocaleString('en-US').replace(/,/g, '_')}
-export const PIN_HASH =
-  '${hash}'
-`,
-);
-
-console.log(`\nWrote ${file}`);
-console.log('Commit and push to make the new PIN live on the deployment.');
+if (local) {
+  // .dev.vars is git-ignored; keep any other variables already in it.
+  const keep = existsSync('.dev.vars')
+    ? readFileSync('.dev.vars', 'utf8')
+        .split('\n')
+        .filter((l) => l.trim() && !Object.keys(secrets).some((k) => l.startsWith(`${k}=`)))
+    : [];
+  writeFileSync('.dev.vars', [...keep, ...Object.entries(secrets).map(([k, v]) => `${k}=${v}`)].join('\n') + '\n');
+  console.log('\nWrote the PIN secrets to .dev.vars (local `wrangler dev` only).');
+} else {
+  for (const [name, value] of Object.entries(secrets)) {
+    const res = spawnSync('npx', ['wrangler', 'secret', 'put', name], { input: `${value}\n`, stdio: ['pipe', 'inherit', 'inherit'] });
+    if (res.status !== 0) {
+      console.error(`\nCould not set ${name}. Run \`npx wrangler login\` first, then try again.`);
+      process.exit(res.status ?? 1);
+    }
+  }
+  console.log('\nPIN secrets set on the worker. The new PIN is live; existing sessions are signed out.');
+}
+rl.close();

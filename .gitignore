@@ -20,3 +20,7 @@ playwright-report/
 # Editor / OS noise
 .DS_Store
 *.local
+
+# Private operational data (real dataset). Loaded into D1 with
+# `npm run seed:real`; never committed.
+private/
