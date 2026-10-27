@@ -4,6 +4,8 @@ import { defineConfig, devices } from '@playwright/test'
 // Locally we reuse the already-running server; CI starts its own.
 const PORT = 15100
 const baseURL = `http://localhost:${PORT}`
+// The app edition (real platform) runs on its own dev server.
+const APP_PORT = 15101
 
 export default defineConfig({
   testDir: './e2e',
@@ -23,20 +25,35 @@ export default defineConfig({
     ...(process.env.CHROMIUM_PATH ? { launchOptions: { executablePath: process.env.CHROMIUM_PATH } } : {}),
   },
   projects: [
-    { name: 'desktop-chromium', use: { ...devices['Desktop Chrome'] } },
-    { name: 'phone', use: { ...devices['Pixel 7'] } },
+    { name: 'desktop-chromium', testIgnore: /app-edition/, use: { ...devices['Desktop Chrome'] } },
+    { name: 'phone', testIgnore: /app-edition/, use: { ...devices['Pixel 7'] } },
     {
       name: 'tablet',
       // iPad geometry (768x1024, DPR 2) but on Chromium: this suite tests
       // layout/viewport behaviour, not engine differences, and keeps CI to
       // one browser download.
+      testIgnore: /app-edition/,
       use: { ...devices['iPad (gen 7)'], browserName: 'chromium' },
     },
+    {
+      name: 'app-edition',
+      testMatch: /app-edition/,
+      use: { ...devices['Desktop Chrome'], baseURL: `http://localhost:${APP_PORT}` },
+    },
   ],
-  webServer: {
-    command: `node ./node_modules/vite/bin/vite.js --port ${PORT} --strictPort`,
-    url: baseURL,
-    reuseExistingServer: !process.env.CI,
-    timeout: 60_000,
-  },
+  webServer: [
+    {
+      command: `node ./node_modules/vite/bin/vite.js --port ${PORT} --strictPort`,
+      url: baseURL,
+      reuseExistingServer: !process.env.CI,
+      timeout: 60_000,
+    },
+    {
+      command: `node ./node_modules/vite/bin/vite.js --port ${APP_PORT} --strictPort`,
+      url: `http://localhost:${APP_PORT}`,
+      env: { VITE_EDITION: 'app' },
+      reuseExistingServer: !process.env.CI,
+      timeout: 60_000,
+    },
+  ],
 })

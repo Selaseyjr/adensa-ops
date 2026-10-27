@@ -11,7 +11,7 @@ describe('About this project', () => {
     render(<AboutProjectDialog open onClose={onClose} />)
     expect(screen.getByText('1 of 4', { exact: false })).toBeInTheDocument()
     for (let i = 0; i < 3; i++) await userEvent.click(screen.getByRole('button', { name: 'Next' }))
-    expect(screen.getByText('Demo and Real data')).toBeInTheDocument()
+    expect(screen.getByText('A public demo of a real platform')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Open the dashboard' }))
     expect(onClose).toHaveBeenCalled()
     expect(hasSeenAbout()).toBe(true)

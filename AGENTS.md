@@ -30,14 +30,15 @@
 - **No tutorial copy.** The product must read like a professional digital
   product, not a walkthrough. No "start there to see…", "click a marker for
   details", "Demo data. Synthetic records…" banners, or on-screen instructions
-  telling users how to use a feature. The Demo/Real toggle already communicates
-  the data mode; do not add mode banners.
+  telling users how to use a feature. The small "Demo" chip in the demo
+  edition's top bar already communicates the data mode; do not add banners.
 - **One exception: "About this project"** (`src/components/AboutProject.tsx`).
   It opens once on a first visit (remembered in `adensa.aboutSeen`), then only
   from the footer link. It describes the product, the business rules and the
   stack; it never tells the user where to click. Keep it to four short steps.
-- Every page ends with the footer "Built by Selasey Gbeddy · GitHub · Case
-  study · About this project".
+- In the demo edition every page ends with the footer "Built by Selasey
+  Gbeddy · GitHub · Case study · About this project". The app edition (the
+  real platform) has neither the footer nor the About panel.
 - Keep on-screen text short. Placeholders in tables are `N/A` (never a dash).
 - Money is always printed with `formatGhs` (`src/lib/format.ts`, re-exported as
   `ghs`): screens, charts, PDFs, toasts and notifications. Never build
@@ -73,7 +74,8 @@
   Source: Suppliers, Compare prices · Money: Cash · People: Customers). It uses
   the surface tokens in light and the navy surface under `.dark`.
 - Top bar: breadcrumbs (group › page), "Search or jump to" (Ctrl+K), theme
-  toggle, Demo/Real switch, notifications, navy "New quote" button.
+  toggle, a "Demo" chip (demo edition) or Sign out (app edition),
+  notifications, navy "New quote" button. There is no Demo/Real switch.
 
 ## Design tokens (First Light)
 
@@ -125,21 +127,41 @@
   response" (customer has not answered) is not "Awaiting deposit" (customer
   accepted, no deposit yet).
 
+## Editions (demo and app)
+
+- One codebase, two builds, chosen by `VITE_EDITION` at build time:
+  - **demo** (default, also when unset): the public portfolio demo at
+    `demo.adensaops.com`. Synthetic seed + live simulation, records stay in the
+    browser, no API calls at all.
+  - **app**: the real platform at `adensaops.com` / `app.adensaops.com`.
+    Full-page sign-in, real data from the API, records synced with D1. No demo
+    seed, no simulation, no About panel or portfolio footer.
+- Edition-specific code lives only in `src/editions/demo.ts` and
+  `src/editions/app.ts`, reached through the `@edition` alias. Never import
+  `data/demo`, `lib/simulation`'s hook, `lib/realAccess` or `lib/remote` from
+  shared code; add what you need to the `Edition` interface instead.
+- `scripts/check-bundle.mjs` (run by every build) fails the app build if
+  demo data or simulation text appears, and the demo build if it can call the
+  real-data API. Both builds fail on real data.
+- Vercel: two projects from this repo with the same settings; only the
+  `VITE_EDITION` environment variable and the domains differ.
+
 ## Data mode
 
-- Demo mode shows simulated data, including the simulated notification feed.
+- The demo edition shows simulated data, including the simulated notification feed.
 - Demo seed dates are offsets from today (`day(n)` in `src/data/demo.ts`), so
   the demo never goes stale. Never hard-code calendar dates in demo data.
 - Demo data follows the business rules; the only breaks are one deliberate
   example per flag (guarded by `src/data/demo.test.ts`). The simulation
   follows the rules too.
-- Real mode NEVER shows simulated data anywhere, including notifications.
-- Real mode is PIN-gated and verified by the worker (`POST /api/session`), which
-  issues a signed session token. The real dataset lives in `server/` and is
+- The app edition NEVER shows simulated data anywhere, including notifications.
+- The app edition is PIN-gated and verified by the worker (`POST /api/session`),
+  which issues a signed session token (to be replaced by staff accounts). The real dataset lives in `server/` and is
   served by `GET /api/real-dataset`; never import it (or `server/pin-hash.js`)
   from `src/`. `npm run build` fails if real data appears in `dist/`.
 - The PIN itself is not stored anywhere in this repository; ask the operator.
   Never write a PIN into source (only its PBKDF2 hash, via `npm run set-pin`
   or the `REAL_PIN_*` worker secrets).
 - The browser reaches the API same-origin (`/api`): Vercel rewrites it to the
-  worker. Keep `adensaops.com` in the worker's CORS allowlist.
+  worker. Keep `adensaops.com` and `app.adensaops.com` in the worker's CORS
+  allowlist.

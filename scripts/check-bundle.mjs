@@ -1,9 +1,12 @@
 #!/usr/bin/env node
-// Fails the build if private Real-mode data ever lands in the frontend
-// bundle. The real dataset and PIN hash live in server/ and are served by the
-// worker only; this guards against an accidental import from src/.
+// Fails the build if a bundle contains what its edition must never ship:
+//  - every edition: private Real-mode data (the real dataset and PIN hash
+//    live in server/ and are served by the worker only),
+//  - app edition: the synthetic demo seed and the simulation,
+//  - demo edition: any call to the real-data API (session, real dataset).
 //
-// Runs after `vite build` (see the "build" script in package.json).
+// Runs after `vite build` (see the "build" script in package.json) with the
+// same VITE_EDITION the build used.
 
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
@@ -31,15 +34,48 @@ const markers = [
   PIN_SALT,
 ].filter((m) => typeof m === 'string' && m.length >= 8 && !demoSource.includes(m))
 
-const leaks = []
-for (const file of files(dist).filter((f) => /\.(js|html|css|json|map)$/.test(f))) {
-  const text = readFileSync(file, 'utf8')
-  for (const m of markers) if (text.includes(m)) leaks.push(`${m} -> ${file.replace(dist, 'dist/')}`)
+const edition = process.env.VITE_EDITION === 'app' ? 'app' : 'demo'
+
+/** `name: '...'` values inside one top-level array of the demo seed (read as text, no TS loader needed). */
+function demoNames(section, nextSection) {
+  const start = demoSource.indexOf(`  ${section}: [`)
+  const end = demoSource.indexOf(`  ${nextSection}: [`, start)
+  return [...demoSource.slice(start, end).matchAll(/\bname: '([^']+)'/g)].map((m) => m[1])
 }
 
-if (leaks.length > 0) {
-  console.error('Private Real-mode data found in the frontend bundle:')
-  for (const l of leaks.slice(0, 20)) console.error(`  ${l}`)
-  process.exit(1)
+// Edition-specific forbidden strings.
+const forbidden =
+  edition === 'app'
+    ? [
+        // Demo seed: synthetic supplier and customer names.
+        ...demoNames('suppliers', 'products'),
+        ...demoNames('customers', 'orders'),
+        // Simulation notifications.
+        'Supplier price updated',
+      ]
+    : ['/api/session', '/api/real-dataset']
+
+const texts = files(dist)
+  .filter((f) => /\.(js|html|css|json|map)$/.test(f))
+  .map((f) => [f.replace(dist, 'dist/'), readFileSync(f, 'utf8')])
+
+function scan(list, label) {
+  const hits = []
+  for (const [file, text] of texts) for (const m of list) if (text.includes(m)) hits.push(`${m} -> ${file}`)
+  if (hits.length > 0) {
+    console.error(`${label} found in the ${edition} bundle:`)
+    for (const h of hits.slice(0, 20)) console.error(`  ${h}`)
+  }
+  return hits.length
 }
-console.log(`Bundle check: no private data in dist/ (${markers.length} markers).`)
+
+const failures =
+  scan(markers, 'Private Real-mode data') +
+  scan(forbidden, edition === 'app' ? 'Demo data or simulation' : 'Real-data API access')
+
+if (failures > 0) process.exit(1)
+console.log(
+  `Bundle check (${edition} edition): no private data (${markers.length} markers), no ${
+    edition === 'app' ? 'demo data' : 'real-data API calls'
+  } (${forbidden.length} markers).`,
+)

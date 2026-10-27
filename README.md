@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://adensaops.com">Live demo</a> ·
+  <a href="https://demo.adensaops.com">Live demo</a> ·
   <a href="#case-study">Case study</a> ·
   <a href="#architecture">Architecture</a> ·
   <a href="#getting-started">Run it locally</a>
@@ -24,9 +24,12 @@ receipt capture, cash in and out, and a dashboard that checks every order
 against the business rules. It is a React + TypeScript single-page app with a
 Cloudflare Worker + D1 backend.
 
-The public deployment opens in **Demo** mode: synthetic data, dated relative to
-today and kept moving by a live simulation. **Real** mode holds the company's
-own records behind a PIN that is verified on the server.
+The same codebase ships as two separate builds:
+
+| Edition | Address | What it is |
+|---|---|---|
+| **Demo** | [demo.adensaops.com](https://demo.adensaops.com) | Public portfolio demo: synthetic data, dated relative to today and kept moving by a live simulation. No backend, no way into real records. |
+| **App** | [adensaops.com](https://adensaops.com) | The real platform: staff sign-in (verified on the server), the company's own records from the API. |
 
 ---
 
@@ -138,14 +141,15 @@ Business logic is plain, tested TypeScript in `src/lib/`:
 | `format.ts` | The one GH¢ formatter |
 | `localData.ts` / `remote.ts` | Local-first records and D1 sync |
 | `simulation.ts` | Demo-only live events (orders, payments, deliveries, repricing) |
-| `realAccess.ts` | Real-mode session and dataset fetch |
+| `realAccess.ts` | App-edition session and dataset fetch |
 
 **Data layers.** What you see is `seed + operator records + simulation`:
 
-1. **Seed:** `src/data/demo.ts` (synthetic, relative dates) in Demo mode; the
-   real dataset from `GET /api/real-dataset` in Real mode.
+1. **Seed:** `src/data/demo.ts` (synthetic, relative dates) in the demo edition; the
+   real dataset from `GET /api/real-dataset` in the app edition.
 2. **Operator records:** quotes, orders, payments and overrides created in the
-   UI, saved to localStorage per mode and synced to D1 (`/api/records`).
+   UI, saved to localStorage per mode; the app edition also syncs them with D1
+   (`/api/records`).
 3. **Simulation:** Demo only, in memory, never saved.
 
 **Backend.** `worker.js` (Cloudflare Workers + D1):
@@ -157,9 +161,22 @@ Business logic is plain, tested TypeScript in `src/lib/`:
 | `GET/PUT /api/records?mode=demo` | Demo operator records | Origin allowlist for writes |
 | `GET/PUT /api/records?mode=real` | Real operator records | Bearer token |
 
+**Editions.** `VITE_EDITION` picks the build (`demo` when unset). The
+`@edition` import alias points at `src/editions/demo.ts` or
+`src/editions/app.ts`, so each bundle contains only its own data code, and
+`scripts/check-bundle.mjs` fails a build that contains the other edition's
+data (or any real data at all).
+
 **Deployment.**
 
-- **Vercel** builds and serves the SPA. `vercel.json` runs `npm test && npm run
+- **Vercel** builds and serves the SPA, as two projects from this repo:
+
+  | Vercel project | `VITE_EDITION` | Domains |
+  |---|---|---|
+  | `adensaops` | `app` | `adensaops.com`, `www.adensaops.com`, `app.adensaops.com` |
+  | `adensaops-demo` | `demo` (or unset) | `demo.adensaops.com` |
+
+  Both use the same build settings from `vercel.json`. `vercel.json` runs `npm test && npm run
   build` (the deploy fails if a test fails) and rewrites `/api/*` to the worker,
   so the browser always talks same-origin. Previously every path, `/api`
   included, was rewritten to `index.html`, and the cross-origin fallback was
@@ -213,29 +230,31 @@ tabular figures; Poppins appears only in the logo.
 
 ```bash
 npm ci
-npm run dev                 # http://localhost:5173, Demo mode
+npm run dev                 # http://localhost:5173, demo edition
 npm test                    # Vitest (unit + component + worker API)
 npm run test:e2e            # Playwright (desktop, phone, tablet)
-npm run build               # typecheck + Vite build + bundle privacy check
+npm run build:demo          # typecheck + Vite build + bundle check, demo edition
+npm run build:app           # same for the app edition
 ```
 
-To use Real mode locally, run the worker and point Vite at it:
+To run the app edition locally against the worker:
 
 ```bash
-npm run build && npx wrangler dev        # worker + local D1 on :8787
-API_PROXY=http://localhost:8787 npm run dev
+npm run build:app && npx wrangler dev    # worker + local D1 on :8787
+VITE_EDITION=app API_PROXY=http://localhost:8787 npm run dev
 ```
 
 | Script | What it does |
 |---|---|
-| `npm run set-pin` | Choose a new Real-mode PIN; writes its hash to `server/pin-hash.js` |
+| `npm run set-pin` | Choose a new app-edition PIN; writes its hash to `server/pin-hash.js` |
 | `npm run brand:assets` | Regenerate favicons, lockups and the Open Graph image |
 
 ## Project structure
 
 ```
 src/
-  App.tsx              shell, navigation, mode/theme, record mutations
+  App.tsx              shell, navigation, theme, sign-in gate, record mutations
+  editions/            demo.ts and app.ts: each edition's data, sync and session
   pages/               Dashboard, Orders, Suppliers, Compare, Cash, Customers
   quoteBuilder.tsx     Quotes list, quote form, printable sheet
   components/          brand, charts, map, tables, dialogs, About panel
