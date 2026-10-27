@@ -37,7 +37,8 @@ const ARRAY_FIELDS = ['customers', 'orders', 'inquiries', 'quotes', 'cash']
 const OBJECT_FIELDS = ['quoteOverrides', 'orderOverrides']
 
 // Cross-origin browser access is limited to our own frontends:
-//  - https://adensaops.com, https://www.adensaops.com (production domain)
+//  - https://adensaops.com, https://www.adensaops.com, https://app.adensaops.com
+//    (the real platform; the public demo never calls the API)
 //  - https://adensaops.vercel.app            (Vercel production alias)
 //  - https://adensaops-<random>-<team>...    (per-deploy Vercel previews)
 // Everything else: reads are CORS-blocked in the browser, writes are
@@ -47,6 +48,7 @@ const OBJECT_FIELDS = ['quoteOverrides', 'orderOverrides']
 const CORS_EXTRA_ORIGINS = new Set([
   'https://adensaops.com',
   'https://www.adensaops.com',
+  'https://app.adensaops.com',
   'https://adensaops.vercel.app',
 ])
 const CORS_ORIGIN_PATTERNS = [/^https:\/\/adensaops-[a-z0-9-]+\.vercel\.app$/]

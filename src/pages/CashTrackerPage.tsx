@@ -191,7 +191,7 @@ function RecordPaymentForm({
             setLabel(e.target.value)
             setError('')
           }}
-          placeholder={kind === 'supplier_out' ? 'e.g. GHACEM stock, Coastal Cement Depot' : 'e.g. Delivery fuel'}
+          placeholder={kind === 'supplier_out' ? 'e.g. GHACEM stock, supplier name' : 'e.g. Delivery fuel'}
           className={`${inputCls} mt-1.5`}
         />
       </div>

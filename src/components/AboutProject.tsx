@@ -64,11 +64,11 @@ const STEPS: Step[] = [
     ),
   },
   {
-    title: 'Demo and Real data',
+    title: 'A public demo of a real platform',
     body: (
       <p>
-        Demo data is synthetic, dated relative to today and kept moving by a live simulation. Real data
-        holds the company's own records behind a PIN and never mixes with the demo.
+        This demo runs on synthetic data, dated relative to today and kept moving by a live simulation. The
+        real platform is a separate build behind staff sign-in; it shares this code but never this data.
       </p>
     ),
   },

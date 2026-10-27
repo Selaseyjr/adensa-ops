@@ -118,20 +118,13 @@ test.describe('live simulation', () => {
     expect(errors).toEqual([])
   })
 
-  test('real data mode never receives simulated notifications', async ({ page }) => {
+  test('the public demo has no way into real records', async ({ page }) => {
     await page.goto('/')
-    // Flip the mode switch to Real (PIN-gated on public deploys; local dev
-    // opens directly or we assert the gate itself).
-    const realBtn = page.getByRole('button', { name: /Real data/i })
-    if ((await realBtn.count()) > 0) {
-      await realBtn.first().click()
-      // Either the PIN gate appears, or the real feed renders empty.
-      const pinVisible = await page.getByRole('dialog', { name: /PIN|Enter PIN/i }).isVisible().catch(() => false)
-      const bell = page.getByRole('button', { name: /Notifications/ })
-      if (!pinVisible) {
-        await expect(bell).toHaveAccessibleName('Notifications, none unread')
-      }
-    }
+    await expect(page.locator('main')).toBeVisible()
+    // No Real switch, no sign-in, no sign-out: the demo build cannot reach real data.
+    await expect(page.getByRole('button', { name: /^Real$/ })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Sign out' })).toHaveCount(0)
+    await expect(page.getByLabel('Access PIN')).toHaveCount(0)
   })
 })
 
@@ -245,7 +238,7 @@ test.describe('about this project', () => {
     const dialog = page.getByRole('dialog')
     await expect(dialog).toHaveAccessibleName('AdensaOps')
     for (let i = 0; i < 3; i++) await dialog.getByRole('button', { name: 'Next' }).click()
-    await expect(dialog).toHaveAccessibleName('Demo and Real data')
+    await expect(dialog).toHaveAccessibleName('A public demo of a real platform')
     await dialog.getByRole('button', { name: 'Open the dashboard' }).click()
     await expect(dialog).toBeHidden()
 
