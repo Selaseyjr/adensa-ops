@@ -64,10 +64,11 @@ offloaded before the customer has paid.
   `src/lib/compare.ts` spreads it across the quantity. The cheapest supplier
   can change with quantity; the quote builder reuses the same function, so a
   quote can never disagree with the comparison screen.
-- **Private data stays on the server.** The real dataset and the PIN hash used
-  to ship in the JavaScript bundle behind a client-side check. They now live in
-  `server/`, the PIN is verified by the worker, and a build step fails if any
-  real record ever appears in `dist/`.
+- **Private data never lives in the code.** The real dataset and the PIN hash
+  used to ship in the JavaScript bundle behind a client-side check. Now the PIN
+  hash exists only as worker secrets, the real dataset only in the D1 database
+  (loaded from a git-ignored local file), the PIN is verified by the worker,
+  and a build step fails if real data ever appears in `dist/`.
 - **Demo that never goes stale.** Every demo date is an offset from today, so
   the public demo always looks like this week's operations.
 
@@ -116,15 +117,15 @@ flowchart LR
 
   subgraph Cloudflare["Cloudflare Worker"]
     API["worker.js<br/>/api/session<br/>/api/real-dataset<br/>/api/records"]
-    Real["server/real-dataset.js<br/>server/pin-hash.js"]
-    D1[("D1<br/>records table")]
+    Secrets[("Worker secrets<br/>PIN hash, session key")]
+    D1[("D1<br/>datasets + records")]
   end
 
   SPA -- "GET pages" --> Static
   SPA -- "same-origin /api" --> Rewrite --> API
   SPA <--> LS
   SPA <--> SS
-  API --> Real
+  API --> Secrets
   API <--> D1
 ```
 
@@ -189,19 +190,22 @@ data (or any real data at all).
   bundle privacy check, Vitest, and Playwright on desktop, phone and tablet for
   every push and pull request.
 
-### Worker secrets
+### Private data and secrets
 
-The worker reads the Real-mode PIN hash from secrets when present, otherwise
-from `server/pin-hash.js` (written by `npm run set-pin`). For production, set:
+Nothing private is in this repository. Setting up (or rotating) the real
+platform, from a machine logged in with `npx wrangler login`:
 
 ```bash
-npx wrangler secret put REAL_PIN_HASH        # hex PBKDF2-SHA256 hash
-npx wrangler secret put REAL_PIN_SALT        # hex salt
-npx wrangler secret put REAL_PIN_ITERATIONS  # e.g. 310000
-npx wrangler secret put SESSION_SECRET       # random string for token signing
+npm run set-pin                 # choose the PIN; stores its hash as worker secrets
+                                # (REAL_PIN_HASH, REAL_PIN_SALT, REAL_PIN_ITERATIONS,
+                                # SESSION_SECRET) and signs everyone out
+npm run seed:real               # loads private/real-dataset.js into D1 (row "real")
 ```
 
-The PIN itself is never stored anywhere; ask the operator for it.
+`private/` is git-ignored: keep the real dataset there (a `.js` default export
+or a `.json` file with the `Dataset` shape). Without the secrets the worker
+answers sign-in with 503 "not configured"; without the seed, the real dataset
+endpoint answers 503 "not loaded". The PIN itself is never stored anywhere.
 
 ## Metric definitions
 
@@ -246,7 +250,8 @@ VITE_EDITION=app API_PROXY=http://localhost:8787 npm run dev
 
 | Script | What it does |
 |---|---|
-| `npm run set-pin` | Choose a new app-edition PIN; writes its hash to `server/pin-hash.js` |
+| `npm run set-pin` | Choose the app-edition PIN; stores its hash as worker secrets (`-- --local` writes `.dev.vars`) |
+| `npm run seed:real` | Load the real dataset from `private/` into D1 (`-- --local` for `wrangler dev`) |
 | `npm run brand:assets` | Regenerate favicons, lockups and the Open Graph image |
 
 ## Project structure
@@ -260,7 +265,7 @@ src/
   components/          brand, charts, map, tables, dialogs, About panel
   lib/                 rules, metrics, compare, quote, format, sync, simulation
   data/demo.ts         synthetic demo seed (relative dates)
-server/                real dataset + PIN hash (worker only, never bundled)
+private/               real dataset, local only (git-ignored), loaded into D1
 worker.js              Cloudflare Worker API
 scripts/               brand assets, PIN, bundle privacy check
 e2e/                   Playwright journeys

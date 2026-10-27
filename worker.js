@@ -3,7 +3,7 @@
 // API:
 //   OPTIONS /api/*                        -> CORS preflight (allowlisted origins)
 //   POST /api/session      { pin }        -> { ok, token, expiresAt } | 401 | 429
-//   GET  /api/real-dataset  (Bearer token) -> { ok, dataset }          | 401
+//   GET  /api/real-dataset  (Bearer token) -> { ok, dataset }   | 401 | 503
 //   GET  /api/records?mode=demo|real       -> { mode, records|null, updatedAt|null }
 //   PUT  /api/records?mode=demo|real       -> { ok: true, updatedAt }
 //   (mode=real requires the Bearer token on both GET and PUT)
@@ -16,19 +16,19 @@
 //
 // Security posture:
 // - Real mode is verified HERE: the PIN is checked against a PBKDF2-SHA256
-//   hash (worker secrets REAL_PIN_HASH/REAL_PIN_SALT/REAL_PIN_ITERATIONS, or
-//   server/pin-hash.js), and a short-lived HMAC-signed session token unlocks
-//   the real dataset and real records. The real dataset lives in
-//   server/real-dataset.js and is never part of the frontend bundle.
+//   hash held only in worker secrets (REAL_PIN_HASH / REAL_PIN_SALT /
+//   REAL_PIN_ITERATIONS), and a short-lived HMAC-signed session token
+//   unlocks the real dataset and real records. Without the secrets, sign-in
+//   answers 503 "not configured": there is no fallback hash in the code.
+// - The real dataset lives in D1 (table `datasets`, loaded with
+//   `npm run seed:real` from a local file that is never committed). Neither
+//   it nor the PIN hash is in this repository or the frontend bundle.
 // - Repeated wrong PINs from one address are locked out for a minute
 //   (best effort, per isolate) and every failure is slowed down.
 // - Writes are rejected when the Origin header is neither same-origin nor an
 //   allowlisted frontend (CSRF guard); CORS answers only allowlisted origins.
 // - mode is an allowlist, payload shape is validated and size-capped,
 //   responses are no-store.
-
-import realDataset from './server/real-dataset.js'
-import { PIN_HASH, PIN_ITERATIONS, PIN_SALT } from './server/pin-hash.js'
 
 const MODES = new Set(['demo', 'real'])
 const MAX_BODY_BYTES = 1_000_000
@@ -151,6 +151,11 @@ async function ensureSchema(db) {
   await db.exec(
     'CREATE TABLE IF NOT EXISTS records (mode TEXT PRIMARY KEY, payload TEXT NOT NULL, updated_at TEXT NOT NULL)',
   )
+  // The real seed dataset (suppliers, products, prices, customers...), loaded
+  // by `npm run seed:real`; one row per dataset name.
+  await db.exec(
+    'CREATE TABLE IF NOT EXISTS datasets (name TEXT PRIMARY KEY, payload TEXT NOT NULL, updated_at TEXT NOT NULL)',
+  )
   schemaReady.add(db)
 }
 
@@ -183,17 +188,20 @@ function safeEqual(a, b) {
   return diff === 0
 }
 
-/** PIN hash settings: worker secrets win over the committed server module. */
+/** PIN hash settings from worker secrets; null until they are set. */
 function pinConfig(env) {
-  return {
-    hash: env?.REAL_PIN_HASH || PIN_HASH,
-    salt: env?.REAL_PIN_SALT || PIN_SALT,
-    iterations: Number(env?.REAL_PIN_ITERATIONS) || PIN_ITERATIONS,
-  }
+  const hash = env?.REAL_PIN_HASH
+  const salt = env?.REAL_PIN_SALT
+  const iterations = Number(env?.REAL_PIN_ITERATIONS) || 310_000
+  if (typeof hash !== 'string' || !/^[0-9a-f]{64}$/i.test(hash)) return null
+  if (typeof salt !== 'string' || !/^[0-9a-f]+$/i.test(salt) || salt.length % 2 !== 0) return null
+  return { hash: hash.toLowerCase(), salt, iterations }
 }
 
 async function verifyPin(env, pin) {
-  const { hash, salt, iterations } = pinConfig(env)
+  const config = pinConfig(env)
+  if (!config) return false
+  const { hash, salt, iterations } = config
   const key = await crypto.subtle.importKey('raw', enc.encode(pin), 'PBKDF2', false, ['deriveBits'])
   const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt: hexToBytes(salt), iterations, hash: 'SHA-256' }, key, 256)
   return safeEqual(toHex(bits), hash)
@@ -201,8 +209,10 @@ async function verifyPin(env, pin) {
 
 /** HMAC key for session tokens: SESSION_SECRET, else derived from the PIN hash (a PIN change logs everyone out). */
 function hmacKey(env) {
-  const { hash, salt } = pinConfig(env)
-  const secret = env?.SESSION_SECRET || `adensaops-session:${hash}:${salt}`
+  const config = pinConfig(env)
+  // Without PIN secrets no token can be issued; the fallback key only keeps
+  // verifyToken well-defined (it then never matches an issued token).
+  const secret = env?.SESSION_SECRET || `adensaops-session:${config?.hash ?? 'unconfigured'}:${config?.salt ?? ''}`
   return crypto.subtle.importKey('raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
 }
 
@@ -218,7 +228,7 @@ export async function issueToken(env, now = Date.now()) {
 }
 
 export async function verifyToken(env, token, now = Date.now()) {
-  if (typeof token !== 'string') return false
+  if (typeof token !== 'string' || !pinConfig(env)) return false
   const parts = token.split('.')
   if (parts.length !== 3 || parts[0] !== 'real') return false
   const expiresAt = Number(parts[1])
@@ -240,6 +250,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 async function handleSession(request, env, url, corsOrigin) {
   if (request.method !== 'POST') return json({ ok: false, error: 'method not allowed' }, 405, corsOrigin)
   if (!isWriteAllowed(request, url)) return json({ ok: false, error: 'cross-origin requests are not allowed' }, 403, corsOrigin)
+
+  if (!pinConfig(env)) return json({ ok: false, error: 'sign-in is not configured' }, 503, corsOrigin)
 
   const client = request.headers.get('cf-connecting-ip') ?? 'unknown'
   const now = Date.now()
@@ -273,7 +285,17 @@ async function handleSession(request, env, url, corsOrigin) {
 async function handleRealDataset(request, env, corsOrigin) {
   if (request.method !== 'GET') return json({ ok: false, error: 'method not allowed' }, 405, corsOrigin)
   if (!(await isRealSession(request, env))) return json({ ok: false, error: 'PIN session required' }, 401, corsOrigin)
-  return json({ ok: true, dataset: realDataset }, 200, corsOrigin)
+  if (!env || !env.DB) return json({ ok: false, error: 'database unavailable' }, 503, corsOrigin)
+  await ensureSchema(env.DB)
+  const row = await env.DB.prepare('SELECT payload FROM datasets WHERE name = ?').bind('real').first()
+  let dataset = null
+  try {
+    dataset = row && typeof row.payload === 'string' ? JSON.parse(row.payload) : null
+  } catch {
+    dataset = null
+  }
+  if (!dataset) return json({ ok: false, error: 'real dataset not loaded' }, 503, corsOrigin)
+  return json({ ok: true, dataset }, 200, corsOrigin)
 }
 
 /* --------------------------------- Records ---------------------------------- */

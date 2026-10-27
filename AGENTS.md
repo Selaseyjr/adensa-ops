@@ -156,12 +156,13 @@
   follows the rules too.
 - The app edition NEVER shows simulated data anywhere, including notifications.
 - The app edition is PIN-gated and verified by the worker (`POST /api/session`),
-  which issues a signed session token (to be replaced by staff accounts). The real dataset lives in `server/` and is
-  served by `GET /api/real-dataset`; never import it (or `server/pin-hash.js`)
-  from `src/`. `npm run build` fails if real data appears in `dist/`.
-- The PIN itself is not stored anywhere in this repository; ask the operator.
-  Never write a PIN into source (only its PBKDF2 hash, via `npm run set-pin`
-  or the `REAL_PIN_*` worker secrets).
+  which issues a signed session token (to be replaced by staff accounts).
+- No private data in the repository, ever: the PIN hash exists only as worker
+  secrets (`npm run set-pin`), the real dataset only in D1 (`npm run
+  seed:real` from the git-ignored `private/` folder), served by
+  `GET /api/real-dataset`. Never commit real records, a PIN or its hash, and
+  never add a fallback hash to the code. `npm run build` fails if real data
+  appears in `dist/`.
 - The browser reaches the API same-origin (`/api`): Vercel rewrites it to the
   worker. Keep `adensaops.com` and `app.adensaops.com` in the worker's CORS
   allowlist.

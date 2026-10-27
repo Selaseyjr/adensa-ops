@@ -1,17 +1,19 @@
 #!/usr/bin/env node
 // Fails the build if a bundle contains what its edition must never ship:
-//  - every edition: private Real-mode data (the real dataset and PIN hash
-//    live in server/ and are served by the worker only),
+//  - every edition: private real data (the real dataset lives in D1, loaded
+//    from the git-ignored private/ folder; when that local file exists, every
+//    real supplier and customer name is checked against the bundle),
 //  - app edition: the synthetic demo seed and the simulation,
 //  - demo edition: any call to the real-data API (session, real dataset).
 //
 // Runs after `vite build` (see the "build" script in package.json) with the
 // same VITE_EDITION the build used.
 
-import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
-import realDataset from '../server/real-dataset.js'
-import { PIN_HASH, PIN_SALT } from '../server/pin-hash.js'
+
+const privateFile = new URL('../private/real-dataset.js', import.meta.url)
+const realDataset = existsSync(privateFile) ? (await import(privateFile.href)).default : null
 
 const dist = new URL('../dist/', import.meta.url).pathname
 
@@ -26,12 +28,13 @@ function files(dir) {
 // not evidence of a leak, so they are excluded.
 const demoSource = readFileSync(new URL('../src/data/demo.ts', import.meta.url), 'utf8')
 
-// Distinctive strings: every real supplier and customer name, plus the hash.
+// Distinctive strings: every real supplier and customer name (when the
+// private file is on this machine), plus the old repository paths.
 const markers = [
-  ...realDataset.suppliers.map((s) => s.name),
-  ...realDataset.customers.map((c) => c.name),
-  PIN_HASH,
-  PIN_SALT,
+  ...(realDataset?.suppliers ?? []).map((s) => s.name),
+  ...(realDataset?.customers ?? []).map((c) => c.name),
+  'server/real-dataset',
+  'server/pin-hash',
 ].filter((m) => typeof m === 'string' && m.length >= 8 && !demoSource.includes(m))
 
 const edition = process.env.VITE_EDITION === 'app' ? 'app' : 'demo'
@@ -70,12 +73,12 @@ function scan(list, label) {
 }
 
 const failures =
-  scan(markers, 'Private Real-mode data') +
+  scan(markers, 'Private real data') +
   scan(forbidden, edition === 'app' ? 'Demo data or simulation' : 'Real-data API access')
 
 if (failures > 0) process.exit(1)
 console.log(
-  `Bundle check (${edition} edition): no private data (${markers.length} markers), no ${
+  `Bundle check (${edition} edition): no private data (${markers.length} markers${realDataset ? '' : ', private/ file not present'}), no ${
     edition === 'app' ? 'demo data' : 'real-data API calls'
   } (${forbidden.length} markers).`,
 )

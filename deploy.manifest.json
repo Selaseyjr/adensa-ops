@@ -6,16 +6,6 @@
       "name": "index.js",
       "type": "esm",
       "path": "./worker.js"
-    },
-    {
-      "name": "server/real-dataset.js",
-      "type": "esm",
-      "path": "./server/real-dataset.js"
-    },
-    {
-      "name": "server/pin-hash.js",
-      "type": "esm",
-      "path": "./server/pin-hash.js"
     }
   ],
   "assetsDirectory": "./dist",

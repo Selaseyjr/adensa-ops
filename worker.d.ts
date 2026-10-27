@@ -16,7 +16,7 @@ export interface D1Like {
 export interface WorkerEnv {
   DB: D1Like
   ASSETS: { fetch(request: Request): Promise<Response> }
-  /** PBKDF2-SHA256 hash of the Real-mode PIN (hex); falls back to server/pin-hash.js. */
+  /** PBKDF2-SHA256 hash of the app-edition PIN (hex). Secrets only: sign-in answers 503 without it. */
   REAL_PIN_HASH?: string
   REAL_PIN_SALT?: string
   REAL_PIN_ITERATIONS?: string

@@ -8,6 +8,7 @@ import worker, { issueToken, verifyToken } from '../../worker.js'
 
 interface FakeDB {
   rows: Map<string, { payload: string; updated_at: string }>
+  datasets: Map<string, { payload: string }>
   execCalls: string[]
   exec: (sql: string) => Promise<unknown>
   prepare: (sql: string) => {
@@ -20,9 +21,11 @@ interface FakeDB {
 
 function fakeDb(): FakeDB {
   const rows = new Map<string, { payload: string; updated_at: string }>()
+  const datasets = new Map<string, { payload: string }>()
   const execCalls: string[] = []
   return {
     rows,
+    datasets,
     execCalls,
     async exec(sql: string) {
       execCalls.push(sql)
@@ -33,6 +36,7 @@ function fakeDb(): FakeDB {
         bind: (...params: string[]) => ({
           first: async () => {
             if (sql.includes('FROM records')) return rows.get(params[0]) ?? null
+            if (sql.includes('FROM datasets')) return (datasets.get(params[0]) as never) ?? null
             return null
           },
           run: async () => {
@@ -66,9 +70,9 @@ async function pinEnv() {
 }
 
 /** Call the worker with a fake env; returns the response and the db used. */
-async function call(path: string, init: RequestInit = {}, db: FakeDB = fakeDb()) {
+async function call(path: string, init: RequestInit = {}, db: FakeDB = fakeDb(), secrets = true) {
   const request = new Request(`https://ops.example.com${path}`, init)
-  const env = { DB: db, ASSETS, ...(await pinEnv()) } as never
+  const env = { DB: db, ASSETS, ...(secrets ? await pinEnv() : {}) } as never
   return worker.fetch(request, env)
 }
 
@@ -182,7 +186,7 @@ describe('worker: D1 round trip', () => {
     expect(demoBody.records).toBeNull()
 
     // Schema initialised exactly once across requests.
-    expect(db.execCalls.filter((sql) => sql.includes('CREATE TABLE'))).toHaveLength(1)
+    expect(db.execCalls.filter((sql) => sql.includes('CREATE TABLE IF NOT EXISTS records'))).toHaveLength(1)
   })
 
   it('overwrites on repeat PUT (last write wins, updatedAt advances)', async () => {
@@ -301,13 +305,35 @@ describe('worker: Real mode is verified server-side', () => {
     expect((await post({ pin: TEST_PIN }, { origin: 'https://evil.example' })).status).toBe(403)
   })
 
-  it('serves the real dataset only to a valid session', async () => {
-    expect((await call('/api/real-dataset')).status).toBe(401)
-    expect((await call('/api/real-dataset', { headers: { authorization: 'Bearer real.9999999999999.forged' } })).status).toBe(401)
-    const res = await call('/api/real-dataset', { headers: { authorization: `Bearer ${await realToken()}` } })
+  it('serves the real dataset from D1 only to a valid session', async () => {
+    const db = fakeDb()
+    db.datasets.set('real', { payload: JSON.stringify({ suppliers: [{ id: 'sup-x' }] }) })
+    expect((await call('/api/real-dataset', {}, db)).status).toBe(401)
+    expect(
+      (await call('/api/real-dataset', { headers: { authorization: 'Bearer real.9999999999999.forged' } }, db)).status,
+    ).toBe(401)
+    const res = await call('/api/real-dataset', { headers: { authorization: `Bearer ${await realToken()}` } }, db)
     expect(res.status).toBe(200)
     const body = (await res.json()) as { dataset: { suppliers: unknown[] } }
-    expect(body.dataset.suppliers.length).toBeGreaterThan(0)
+    expect(body.dataset.suppliers).toEqual([{ id: 'sup-x' }])
+  })
+
+  it('reports a dataset that has not been loaded yet', async () => {
+    const res = await call('/api/real-dataset', { headers: { authorization: `Bearer ${await realToken()}` } })
+    expect(res.status).toBe(503)
+    expect(((await res.json()) as { error: string }).error).toMatch(/not loaded/)
+  })
+
+  it('refuses sign-in until the PIN secrets are set (no hash in the code)', async () => {
+    const res = await call(
+      '/api/session',
+      { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pin: TEST_PIN }) },
+      fakeDb(),
+      false,
+    )
+    expect(res.status).toBe(503)
+    // A token minted under other secrets is worthless without them.
+    expect(await verifyToken({}, await realToken())).toBe(false)
   })
 
   it('rejects expired tokens', async () => {
