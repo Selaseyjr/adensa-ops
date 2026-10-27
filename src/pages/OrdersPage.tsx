@@ -151,8 +151,11 @@ export function OrdersPage({
   onOpenOrderConsumed,
   onNavigate,
   onOrderAction,
+  permissions = { approve: true, money: true, deliver: true },
 }: {
   data: Dataset
+  /** What the signed-in position may do (lib/permissions); the demo allows everything. */
+  permissions?: { approve: boolean; money: boolean; deliver: boolean }
   /** Order handed over from another page (quote builder View) to open at mount. */
   openOrderId?: string | null
   onOpenOrderConsumed?: () => void
@@ -721,7 +724,7 @@ export function OrdersPage({
                 Every stage change and payment can be undone from the toast.
               </span>
               <span className="flex items-center gap-2">
-              {open.stage !== 'settled' && (
+              {open.stage !== 'settled' && permissions.approve && (
                 <button
                   type="button"
                   onClick={() => openEdit(open)}
@@ -1236,7 +1239,7 @@ export function OrdersPage({
                     {open.stage === 'settled' && `Closed ${open.completedOn ?? ''}. Receipt and cash both in.`}
                   </p>
                   <div className="flex shrink-0 flex-wrap gap-2">
-                    {open.stage === 'draft' && (
+                    {open.stage === 'draft' && permissions.approve && (
                       <button
                         type="button"
                         onClick={() =>
@@ -1247,7 +1250,7 @@ export function OrdersPage({
                         <CheckCircle2 size={14} aria-hidden="true" /> Approve order
                       </button>
                     )}
-                    {open.stage === 'quoted' && (
+                    {open.stage === 'quoted' && permissions.money && (
                       <button
                         type="button"
                         onClick={() => {
@@ -1261,7 +1264,7 @@ export function OrdersPage({
                     )}
                     {open.stage === 'deposit' && (
                       <>
-                        {balance > 0 && (
+                        {balance > 0 && permissions.money && (
                           <button
                             type="button"
                             onClick={() => {
@@ -1273,6 +1276,7 @@ export function OrdersPage({
                             <Wallet size={14} aria-hidden="true" /> Record payment
                           </button>
                         )}
+                        {permissions.approve && (
                         <button
                           type="button"
                           disabled={open.depositGhs <= 0}
@@ -1284,11 +1288,12 @@ export function OrdersPage({
                         >
                           <Truck size={14} aria-hidden="true" /> Place supplier order
                         </button>
+                        )}
                       </>
                     )}
                     {open.stage === 'ordered' && (
                       <>
-                        {balance > 0 && (
+                        {balance > 0 && permissions.money && (
                           <button
                             type="button"
                             onClick={() => {
@@ -1300,6 +1305,7 @@ export function OrdersPage({
                             <Wallet size={14} aria-hidden="true" /> Record payment
                           </button>
                         )}
+                        {permissions.deliver && (
                         <button
                           type="button"
                           onClick={() => {
@@ -1312,9 +1318,10 @@ export function OrdersPage({
                         >
                           <ClipboardCheck size={14} aria-hidden="true" /> Record delivery
                         </button>
+                        )}
                       </>
                     )}
-                    {open.stage === 'delivered' &&
+                    {open.stage === 'delivered' && permissions.money &&
                       (balance > 0 ? (
                         <button
                           type="button"

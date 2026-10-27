@@ -1,9 +1,9 @@
 # AdensaOps CI: the same gates a contributor runs locally.
 #
 #   1. build = tsc --noEmit && vite build && bundle privacy check (the real
-#              dataset and PIN hash must never reach dist/)
+#              dataset must never reach dist/)
 #   2. unit  = Vitest: business rules, shared metrics, compare and quote maths,
-#              components, worker API (sessions, real dataset, records)
+#              components, worker API (staff sign-in, team, real dataset, records)
 #   3. e2e   = Playwright on Chromium in desktop/phone/tablet projects
 #
 # npm ci honors the lockfile exactly: no drift between what was tested and

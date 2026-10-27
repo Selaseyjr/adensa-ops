@@ -6,6 +6,11 @@
       "name": "index.js",
       "type": "esm",
       "path": "./worker.js"
+    },
+    {
+      "name": "server/staff.js",
+      "type": "esm",
+      "path": "./server/staff.js"
     }
   ],
   "assetsDirectory": "./dist",

@@ -19,7 +19,7 @@
 //   unioned by id so records created on another device still arrive.
 
 import type { DataMode } from './dataSource'
-import { getRealToken } from './realAccess'
+import { getStaffToken } from './staffAuth'
 import type { LocalRecords } from './localData'
 import { mergeRecords as mergeFn } from './localData'
 
@@ -37,9 +37,9 @@ function defaultSharedBase(): string {
   return import.meta.env.PROD ? SHARED_API : ''
 }
 
-/** Real records are private: send the PIN session token with them. */
+/** Real records are private: send the staff session token with them. */
 function authHeaders(mode: DataMode): Record<string, string> {
-  const token = mode === 'real' ? getRealToken() : null
+  const token = mode === 'real' ? getStaffToken() : null
   return token ? { authorization: `Bearer ${token}` } : {}
 }
 

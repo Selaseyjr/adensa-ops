@@ -14,6 +14,7 @@ import type { ComponentType } from 'react'
 import type { DataMode, Dataset } from '../lib/dataSource'
 import type { LocalRecords } from '../lib/localData'
 import type { AppNotification } from '../lib/notifications'
+import type { StaffUser } from '../lib/permissions'
 
 export type EditionName = 'demo' | 'app'
 
@@ -33,8 +34,16 @@ export interface Edition {
   mode: DataMode
   /** Full-page sign-in shown before the shell (app edition only). */
   SignIn: ComponentType<{ onSignedIn: () => void }> | null
-  /** True when no sign-in is needed or a valid session exists. */
-  isSignedIn(): boolean
+  /** Forced password change after signing in with a temporary password. */
+  FirstPassword: ComponentType<{ name: string; onDone: () => void }> | null
+  /** Password change form for the account menu. */
+  ChangePassword: ComponentType<{ onDone: () => void; onCancel: () => void }> | null
+  /** Team management page (Product Lead, app edition). */
+  TeamPage: ComponentType<{ me: StaffUser }> | null
+  /** The signed-in person (demo: a fixed visitor with full access); null when signed out. */
+  currentUser(): StaffUser | null
+  /** Re-read the person's profile from the server (role changes apply at once). */
+  refreshUser(): Promise<StaffUser | null>
   /** End the session (app edition); the demo has none. */
   signOut(): void
   /** Shows the portfolio presentation (About panel, author footer). */

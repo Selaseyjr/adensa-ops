@@ -56,7 +56,7 @@ const forbidden =
         // Simulation notifications.
         'Supplier price updated',
       ]
-    : ['/api/session', '/api/real-dataset']
+    : ['/api/auth/', '/api/staff', '/api/real-dataset']
 
 const texts = files(dist)
   .filter((f) => /\.(js|html|css|json|map)$/.test(f))

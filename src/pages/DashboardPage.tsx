@@ -107,8 +107,11 @@ export function DashboardPage({
   data,
   onNavigate,
   onOpenOrder,
+  showCash = true,
 }: {
   data: Dataset
+  /** Cash figures are for positions with cash access (lib/permissions). */
+  showCash?: boolean
   onNavigate: (target: NotificationTarget) => void
   onOpenOrder?: (orderId: string) => void
 }) {
@@ -342,8 +345,8 @@ export function DashboardPage({
       </section>
 
       {/* ===== KPI cards ===== */}
-      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Key figures">
-        {kpis.map((k) => (
+      <section className={`grid grid-cols-1 gap-3 sm:grid-cols-2 ${showCash ? 'xl:grid-cols-4' : 'xl:grid-cols-3'}`} aria-label="Key figures">
+        {kpis.filter((k) => showCash || k.key !== 'cash').map((k) => (
           <button
             key={k.key}
             type="button"
@@ -513,6 +516,7 @@ export function DashboardPage({
       </div>
 
       {/* ===== Cash in / out, last 6 weeks ===== */}
+      {showCash && (
       <Panel
         title="Cash in and out"
         sub={`Last 6 weeks · ${ghs(sixIn)} in · ${ghs(sixOut)} out`}
@@ -557,6 +561,7 @@ export function DashboardPage({
           </div>
         )}
       </Panel>
+      )}
 
       {/* ===== KPI drill-down ===== */}
       {kpiDetail && (
